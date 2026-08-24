@@ -68,7 +68,7 @@ except ImportError:
 # ---------------------------------------------------------------------------
 # Paths
 # ---------------------------------------------------------------------------
-PROJECT_ROOT = Path.home() / "GQD_Project"
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DATA_DIR = PROJECT_ROOT / "data"
 SPLIT_DIR = DATA_DIR / "train_test_split"
 FEATURES_DIR = PROJECT_ROOT / "features"

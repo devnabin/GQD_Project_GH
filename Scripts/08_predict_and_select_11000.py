@@ -1,88 +1,138 @@
 #!/usr/bin/env python3
 """
-Predict band gaps and select 11,000 molecules for xTB validation
+Train machine learning models to predict the HOMO-LUMO gap
 
-Uses the trained LightGBM model to predict band gaps for the screening
-set (the molecules not used in training/testing), then selects 11,000
-of them for actual xTB calculation.
-
-Selection is stratified across ten band-gap bins spanning 0.70-1.75 eV,
-with roughly 1,100 molecules drawn at random from each bin. This spreads
-the validation set across the model's full prediction range rather than
-concentrating only on the most promising region. If a bin doesn't have
-enough molecules, the shortfall is filled from the well-populated middle
-range (0.90-1.40 eV), and each filled molecule keeps its own actual
-predicted gap.
+Trains five regression models on the 4,000-molecule training set (Random
+Forest, XGBoost, LightGBM, CatBoost, and a neural network), evaluates each
+on the 1,000-molecule test set, and picks the best one based on test R².
 
 Input:
-  - LightGBM_model.pkl (trained model)
-  - molecular_features.parquet
-  - screening_molecules.csv (the ~94,648 molecules not used for training/testing)
+  - molecular_features.parquet (features for all molecules)
+  - gap_values_train.csv (4,000 training molecules with xTB gaps)
+  - gap_values_test.csv (1,000 test molecules with xTB gaps)
 
 Output:
-  - 11000_selected_molecules.csv
-  - selection_statistics.csv
-  - gap distribution plots (PNG)
+  - RandomForest_model.pkl
+  - XGBoost_model.pkl
+  - LightGBM_model.pkl
+  - CatBoost_model.pkl
+  - NeuralNetwork_model.pkl
+  - feature_scaler.pkl
+  - training_metrics.json
 
 Usage:
-  python 08_predict_and_select_11000.py
+  python 07_ml_model_training.py
 """
 
 import os
 import sys
-import pickle
-import numpy as np
 import pandas as pd
+import numpy as np
 import logging
 from datetime import datetime
 from pathlib import Path
-import matplotlib.pyplot as plt
-import seaborn as sns
+import json
+import pickle
+import warnings
 
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
+warnings.filterwarnings('ignore')
 
-sns.set_style("whitegrid")
-plt.rcParams['figure.figsize'] = (12, 6)
+from sklearn.preprocessing import StandardScaler
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_error
+
+try:
+    import xgboost as xgb
+    XGBOOST_AVAILABLE = True
+except ImportError:
+    XGBOOST_AVAILABLE = False
+
+try:
+    import lightgbm as lgb
+    LIGHTGBM_AVAILABLE = True
+except ImportError:
+    LIGHTGBM_AVAILABLE = False
+
+try:
+    import catboost as cb
+    CATBOOST_AVAILABLE = True
+except ImportError:
+    CATBOOST_AVAILABLE = False
+
+try:
+    from sklearn.neural_network import MLPRegressor
+    NEURAL_AVAILABLE = True
+except ImportError:
+    NEURAL_AVAILABLE = False
 
 # ---------------------------------------------------------------------------
 # Paths
 # ---------------------------------------------------------------------------
-PROJECT_DIR = Path.home() / "GQD_Project"
-MODELS_DIR = PROJECT_DIR / "models"
-FEATURES_DIR = PROJECT_DIR / "features"
-SELECTION_DIR = PROJECT_DIR / "selection"
-LOGS_DIR = SELECTION_DIR / "logs"
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+DATA_DIR = PROJECT_ROOT / "data"
+SPLIT_DIR = DATA_DIR / "train_test_split"
+FEATURES_DIR = PROJECT_ROOT / "features"
+RESULTS_DIR = PROJECT_ROOT / "models"
+LOGS_DIR = PROJECT_ROOT / "logs"
 
-DATA_DIR = PROJECT_DIR / "data/train_test_split"
+FEATURES_PARQUET = FEATURES_DIR / "molecular_features.parquet"
+TRAIN_GAP_CSV = PROJECT_ROOT / "xTB_results" / "gap_values_train.csv"
+TEST_GAP_CSV = PROJECT_ROOT / "xTB_results" / "gap_values_test.csv"
+TRAIN_CSV = SPLIT_DIR / "train_molecules.csv"
+TEST_CSV = SPLIT_DIR / "test_molecules.csv"
 
-SELECTION_DIR.mkdir(parents=True, exist_ok=True)
+TRAINING_LOG = RESULTS_DIR / "training_metrics.json"
+
+RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 LOGS_DIR.mkdir(parents=True, exist_ok=True)
 
-FEATURES_FILE = FEATURES_DIR / "molecular_features.parquet"
-LIGHTGBM_MODEL_FILE = MODELS_DIR / "LightGBM_model.pkl"
-SCREENING_MOLECULES_FILE = DATA_DIR / "screening_molecules.csv"
-
 # ---------------------------------------------------------------------------
-# Band-gap bins for stratified selection
+# Logging
 # ---------------------------------------------------------------------------
-RANGES = [
-    {"range": "0.70-0.80", "min": 0.70, "max": 0.80, "count": 1100, "role": "Lower boundary learning"},
-    {"range": "0.80-0.90", "min": 0.80, "max": 0.90, "count": 1100, "role": "Safe zone (high confidence)"},
-    {"range": "0.90-1.00", "min": 0.90, "max": 1.00, "count": 1100, "role": "Safe zone"},
-    {"range": "1.00-1.10", "min": 1.00, "max": 1.10, "count": 1100, "role": "Safe zone (peak)"},
-    {"range": "1.10-1.20", "min": 1.10, "max": 1.20, "count": 1100, "role": "Safe zone (peak)"},
-    {"range": "1.20-1.30", "min": 1.20, "max": 1.30, "count": 1100, "role": "Safe zone"},
-    {"range": "1.30-1.40", "min": 1.30, "max": 1.40, "count": 1100, "role": "Safe zone"},
-    {"range": "1.40-1.50", "min": 1.40, "max": 1.50, "count": 1100, "role": "Safe zone"},
-    {"range": "1.50-1.65", "min": 1.50, "max": 1.65, "count": 1100, "role": "Good confidence"},
-    {"range": "1.65-1.75", "min": 1.65, "max": 1.75, "count": 1100, "role": "Upper boundary learning"},
-]
+class StageLogger:
+    """Logs to both a file and the console, flushing after each line so
+    output shows up immediately when running under nohup."""
 
-TOTAL_TARGET = sum(r["count"] for r in RANGES)
+    def __init__(self, log_file):
+        self.log_file = log_file
+        self.handlers = []
+
+        file_handler = logging.FileHandler(log_file)
+        file_handler.setLevel(logging.INFO)
+        file_formatter = logging.Formatter(
+            '[%(asctime)s] [%(levelname)s] %(message)s',
+            datefmt='%Y-%m-%d %H:%M:%S'
+        )
+        file_handler.setFormatter(file_formatter)
+        self.handlers.append(file_handler)
+
+        console_handler = logging.StreamHandler(sys.stdout)
+        console_handler.setLevel(logging.INFO)
+        console_formatter = logging.Formatter(
+            '[%(asctime)s] %(message)s',
+            datefmt='%Y-%m-%d %H:%M:%S'
+        )
+        console_handler.setFormatter(console_formatter)
+        self.handlers.append(console_handler)
+
+        self.logger = logging.getLogger('ml_training')
+        self.logger.setLevel(logging.INFO)
+
+        for handler in self.logger.handlers[:]:
+            self.logger.removeHandler(handler)
+
+        for handler in self.handlers:
+            self.logger.addHandler(handler)
+
+    def info(self, msg):
+        self.logger.info(msg)
+        sys.stdout.flush()
+
+    def error(self, msg):
+        self.logger.error(msg)
+        sys.stderr.flush()
+
+logger = StageLogger(LOGS_DIR / "ml_model_training.log")
 
 
 def log_section(title):
@@ -92,350 +142,380 @@ def log_section(title):
     logger.info("="*80)
 
 
-def load_lightgbm_model():
-    """Load the LightGBM model trained on the 4,000/1,000 xTB dataset."""
-    log_section("LOAD LIGHTGBM MODEL")
+def load_training_data():
+    """Load molecular features and xTB gap values for the training set."""
+    log_section("LOAD TRAINING DATA")
+
+    logger.info("Loading features...")
+    df_features = pd.read_parquet(FEATURES_PARQUET)
+    logger.info(f"Features shape: {df_features.shape}")
+
+    feature_cols = [c for c in df_features.columns
+                   if c != 'mol_id' and pd.api.types.is_numeric_dtype(df_features[c])]
+    logger.info(f"Numeric feature columns: {len(feature_cols)}")
+
+    logger.info("Loading training molecule IDs...")
+    df_train = pd.read_csv(TRAIN_CSV)
+    train_ids = set(df_train['mol_id'].values)
+    logger.info(f"Training molecules: {len(train_ids)}")
+
+    logger.info("Loading gap values...")
+    df_gaps = pd.read_csv(TRAIN_GAP_CSV)
+    df_gaps_success = df_gaps[df_gaps['status'] == 'success'].copy()
+    logger.info(f"Successful gaps: {len(df_gaps_success)}")
+
+    logger.info("Filtering to training molecules...")
+    df_train_features = df_features[['mol_id'] + feature_cols]
+    df_train_features = df_train_features[df_train_features['mol_id'].isin(train_ids)].copy()
 
-    if not LIGHTGBM_MODEL_FILE.exists():
-        raise FileNotFoundError(f"LightGBM model not found at {LIGHTGBM_MODEL_FILE}")
+    logger.info("Merging features with gap values...")
+    df_merged = df_train_features.merge(
+        df_gaps_success[['mol_id', 'HOMO_LUMO_gap_eV']],
+        on='mol_id',
+        how='inner'
+    )
 
-    logger.info(f"Loading model from: {LIGHTGBM_MODEL_FILE}")
-    with open(LIGHTGBM_MODEL_FILE, 'rb') as f:
-        model = pickle.load(f)
+    X_train = df_merged[feature_cols].values
+    y_train = df_merged['HOMO_LUMO_gap_eV'].values
 
-    logger.info("Model loaded")
-    return model
-
-
-def load_features_and_ids():
-    """Load the screening molecule list and its features."""
-    log_section("LOAD FEATURES AND MOLECULE IDs")
-
-    if not SCREENING_MOLECULES_FILE.exists():
-        raise FileNotFoundError(f"Screening molecules file not found at {SCREENING_MOLECULES_FILE}")
-
-    logger.info(f"Loading screening molecules from: {SCREENING_MOLECULES_FILE}")
-    screening_df = pd.read_csv(SCREENING_MOLECULES_FILE)
-    logger.info(f"Screening molecules: {screening_df.shape[0]}")
-
-    if not FEATURES_FILE.exists():
-        raise FileNotFoundError(f"Features file not found at {FEATURES_FILE}")
-
-    logger.info(f"Loading features from: {FEATURES_FILE}")
-    features_df = pd.read_parquet(FEATURES_FILE)
-    logger.info(f"Features loaded: {features_df.shape[0]} molecules x {features_df.shape[1]} features")
-
-    # Keep only the feature rows that correspond to the screening molecules
-    if len(features_df) > len(screening_df):
-        start_idx = len(features_df) - len(screening_df)
-        features_df = features_df.iloc[start_idx:].reset_index(drop=True)
-        logger.info(f"Filtered features to {len(features_df)} screening molecules")
-
-    screening_df = screening_df.reset_index(drop=True)
-
-    return features_df, screening_df
-
-
-def predict_all_molecules(model, features_df):
-    """Predict the band gap for every screening molecule."""
-    log_section("PREDICT GAPS FOR SCREENING MOLECULES")
-
-    logger.info(f"Predicting for {len(features_df)} molecules...")
-
-    numeric_features = features_df.select_dtypes(include=[np.number])
-    logger.info(f"Using {numeric_features.shape[1]} numeric features")
-
-    predictions = model.predict(numeric_features.values)
-
-    logger.info(f"Predicted gap range: {predictions.min():.4f} - {predictions.max():.4f} eV")
-    logger.info(f"Mean: {predictions.mean():.4f} eV, median: {np.median(predictions):.4f} eV")
-
-    return predictions
-
-
-def select_stratified(features_df, screening_df, predictions):
-    """
-    Select molecules across the ten band-gap bins. First tries to fill
-    each bin to its target count with a random draw. Any shortfall is
-    then filled from the middle range (0.90-1.40 eV), where predictions
-    are most reliable.
-    """
-    log_section("STRATIFIED SELECTION ACROSS RANGES")
-
-    selected_molecules = []
-    selection_stats = []
-    total_selected = 0
-
-    logger.info("Step 1: primary selection, target 1,100 per range")
-
-    for idx, range_config in enumerate(RANGES, 1):
-        range_min = range_config["min"]
-        range_max = range_config["max"]
-        target_count = range_config["count"]
-        range_label = range_config["range"]
-
-        mask = (predictions >= range_min) & (predictions < range_max)
-        available_count = mask.sum()
-
-        logger.info(f"Range {idx}: {range_label} eV ({range_config['role']}) - "
-                    f"available: {available_count}, target: {target_count}")
-
-        range_indices = np.where(mask)[0]
-
-        if available_count == 0:
-            logger.warning(f"  No molecules available in this range - will fill from safe zone")
-            selection_stats.append({
-                "range": range_label, "role": range_config["role"], "target": target_count,
-                "available": 0, "selected": 0, "percentage": 0.0, "status": "NO_AVAILABLE"
-            })
-            continue
-
-        if available_count >= target_count:
-            selected_indices = np.random.choice(range_indices, size=target_count, replace=False)
-            selected_count = target_count
-            status = "MET"
-        else:
-            selected_indices = range_indices
-            selected_count = available_count
-            logger.warning(f"  Only {selected_count} available (target {target_count}) - will fill from pool")
-            status = "PARTIAL"
-
-        for mol_idx in selected_indices:
-            mol_id = f"screening_mol_{mol_idx}"
-            selected_molecules.append({
-                "molecule_id": mol_id,
-                "range": range_label,
-                "predicted_gap": predictions[mol_idx]
-            })
-
-        total_selected += selected_count
-
-        percentage = (selected_count / available_count) * 100 if available_count > 0 else 0
-        selection_stats.append({
-            "range": range_label, "role": range_config["role"], "target": target_count,
-            "available": available_count, "selected": selected_count,
-            "percentage": percentage, "status": status
-        })
-
-    logger.info(f"Primary selection complete: {total_selected} molecules")
-
-    for stat in selection_stats:
-        stat.setdefault('filled', 0)
-        stat.setdefault('final_selected', stat['selected'])
-
-    # Fill any remaining shortfall from the reliable middle range
-    remaining_needed = TOTAL_TARGET - total_selected
-
-    if remaining_needed > 0:
-        log_section("STEP 2: FILL REMAINING SHORTFALL")
-        logger.info(f"Need {remaining_needed} more molecules to reach {TOTAL_TARGET}")
-        logger.info("Filling from the 0.90-1.40 eV range (molecules keep their real predicted gap)")
-
-        safe_fill_mask = (predictions >= 0.90) & (predictions < 1.40)
-        available_for_fill = np.where(safe_fill_mask)[0]
-
-        already_selected_indices = set(int(m['molecule_id'].split('_')[-1]) for m in selected_molecules)
-        available_for_fill = np.array([idx for idx in available_for_fill if idx not in already_selected_indices])
-
-        logger.info(f"Available in safe zone for filling: {len(available_for_fill)}")
-
-        fill_count = min(remaining_needed, len(available_for_fill))
-        if fill_count < remaining_needed:
-            logger.warning(f"Only {len(available_for_fill)} available (needed {remaining_needed}) - "
-                           f"selecting all available")
-
-        if fill_count > 0:
-            fill_indices = np.random.choice(available_for_fill, size=fill_count, replace=False)
-            filled_by_range = {r["range"]: 0 for r in RANGES}
-
-            for mol_idx in fill_indices:
-                mol_id = f"screening_mol_{mol_idx}"
-                mol_gap = predictions[mol_idx]
-
-                assigned_range = None
-                for range_config in RANGES:
-                    if range_config["min"] <= mol_gap < range_config["max"]:
-                        assigned_range = range_config["range"]
-                        filled_by_range[assigned_range] += 1
-                        break
-
-                if assigned_range:
-                    selected_molecules.append({
-                        "molecule_id": mol_id, "range": assigned_range, "predicted_gap": mol_gap
-                    })
-
-                    stat_idx = [i for i, s in enumerate(selection_stats) if s['range'] == assigned_range][0]
-                    selection_stats[stat_idx]["filled"] += 1
-                    selection_stats[stat_idx]["final_selected"] += 1
-
-            logger.info("Filled molecules by range:")
-            for range_label, count in filled_by_range.items():
-                if count > 0:
-                    logger.info(f"  {range_label}: +{count}")
-
-    selected_df = pd.DataFrame(selected_molecules)
-    logger.info(f"Total selected: {len(selected_df)} molecules")
-
-    log_section("SELECTION SUMMARY")
-    for stat in selection_stats:
-        logger.info(f"{stat['range']}: target={stat['target']} selected={stat['selected']} "
-                    f"filled={stat.get('filled', 0)} total={stat.get('final_selected', stat['selected'])}")
-
-    return selected_df, selection_stats
-
-
-def prepare_output(selected_df, screening_df):
-    """Sort the selection into a clean, ordered output table."""
-    log_section("PREPARE OUTPUT")
-
-    output_df = selected_df[['molecule_id', 'range', 'predicted_gap']].copy()
-
-    range_order_map = {r["range"]: i + 1 for i, r in enumerate(RANGES)}
-    output_df['range_order'] = output_df['range'].map(range_order_map)
-    output_df = output_df.sort_values(['range_order', 'predicted_gap']).drop('range_order', axis=1)
-
-    logger.info(f"Output ready: {len(output_df)} molecules")
-
-    return output_df
-
-
-def save_results(output_df, selection_stats):
-    """Save the selected molecule list and selection statistics."""
-    log_section("SAVE RESULTS")
-
-    output_file = SELECTION_DIR / "11000_selected_molecules.csv"
-    output_df.to_csv(output_file, index=False)
-    logger.info(f"Saved: {output_file}")
-
-    stats_df = pd.DataFrame(selection_stats)
-    cols_to_save = ['range', 'role', 'target', 'selected', 'filled', 'final_selected']
-    cols_to_save = [c for c in cols_to_save if c in stats_df.columns]
-
-    stats_file = SELECTION_DIR / "selection_statistics.csv"
-    stats_df[cols_to_save].to_csv(stats_file, index=False)
-    logger.info(f"Saved: {stats_file}")
-
-    total_selected = stats_df['selected'].sum()
-    total_filled = stats_df['filled'].sum() if 'filled' in stats_df.columns else 0
-
-    logger.info(f"\nGrand total: {total_selected} originally selected, "
-                f"{total_filled} filled, {len(output_df)} final")
-
-    return output_file, stats_file
-
-
-def create_visualizations(output_df, predictions, selection_stats):
-    """Plot the prediction distribution and the selection breakdown by range."""
-    log_section("CREATE VISUALIZATIONS")
-
-    fig, ax = plt.subplots(figsize=(14, 6))
-    ax.hist(predictions, bins=100, alpha=0.7, color='skyblue', edgecolor='black', label='All molecules')
-
-    colors = plt.cm.Set3(np.linspace(0, 1, 10))
-    for idx, range_config in enumerate(RANGES):
-        ax.axvline(range_config["min"], color=colors[idx], linestyle='--', alpha=0.5)
-
-    ax.axvspan(0.73, 1.70, alpha=0.1, color='green', label='Target range')
-    ax.set_xlabel('Predicted Gap (eV)', fontsize=12)
-    ax.set_ylabel('Frequency', fontsize=12)
-    ax.set_title('Distribution of Predicted Band Gaps (screening set)', fontsize=14, fontweight='bold')
-    ax.legend(fontsize=10)
-    ax.grid(True, alpha=0.3)
-
-    plt.tight_layout()
-    viz1_file = SELECTION_DIR / "gap_distribution_all_molecules.png"
-    plt.savefig(viz1_file, dpi=150, bbox_inches='tight')
-    logger.info(f"Saved: {viz1_file}")
-    plt.close()
-
-    fig, ax = plt.subplots(figsize=(14, 6))
-    ax.hist(output_df['predicted_gap'], bins=50, alpha=0.7, color='lightgreen',
-            edgecolor='black', label=f'Selected ({len(output_df)})')
-    ax.axvspan(0.73, 1.70, alpha=0.1, color='green', label='Target range')
-
-    for range_config in RANGES:
-        ax.axvline(range_config["min"], color='red', linestyle='--', alpha=0.3, linewidth=0.8)
-
-    ax.set_xlabel('Predicted Gap (eV)', fontsize=12)
-    ax.set_ylabel('Frequency', fontsize=12)
-    ax.set_title('Distribution of Selected Molecules', fontsize=14, fontweight='bold')
-    ax.legend(fontsize=10)
-    ax.grid(True, alpha=0.3)
-
-    plt.tight_layout()
-    viz2_file = SELECTION_DIR / "gap_distribution_selected.png"
-    plt.savefig(viz2_file, dpi=150, bbox_inches='tight')
-    logger.info(f"Saved: {viz2_file}")
-    plt.close()
-
-    fig, ax = plt.subplots(figsize=(14, 6))
-    range_labels = [r["range"] for r in RANGES]
-    target_counts = [r["count"] for r in RANGES]
-
-    stats_df = pd.DataFrame(selection_stats)
-    final_counts = []
-    for label in range_labels:
-        row = stats_df[stats_df['range'] == label]
-        final_counts.append(row.iloc[0].get('final_selected', row.iloc[0]['selected']) if len(row) > 0 else 0)
-
-    x = np.arange(len(range_labels))
-    width = 0.35
-
-    bars1 = ax.bar(x - width/2, target_counts, width, label='Target', alpha=0.8, color='skyblue')
-    bars2 = ax.bar(x + width/2, final_counts, width, label='Selected', alpha=0.8, color='lightgreen')
-
-    ax.set_xlabel('Range (eV)', fontsize=12)
-    ax.set_ylabel('Number of Molecules', fontsize=12)
-    ax.set_title('Target vs Selected Molecules by Range', fontsize=14, fontweight='bold')
-    ax.set_xticks(x)
-    ax.set_xticklabels(range_labels, rotation=45)
-    ax.legend(fontsize=10)
-    ax.grid(True, alpha=0.3, axis='y')
-
-    for bars in [bars1, bars2]:
-        for bar in bars:
-            height = bar.get_height()
-            if height > 0:
-                ax.text(bar.get_x() + bar.get_width()/2., height, f'{int(height)}',
-                       ha='center', va='bottom', fontsize=8)
-
-    plt.tight_layout()
-    viz3_file = SELECTION_DIR / "target_vs_selected.png"
-    plt.savefig(viz3_file, dpi=150, bbox_inches='tight')
-    logger.info(f"Saved: {viz3_file}")
-    plt.close()
+    logger.info(f"Training set: {X_train.shape[0]} molecules x {X_train.shape[1]} features")
+    logger.info(f"Gap range: {y_train.min():.4f} - {y_train.max():.4f} eV")
+
+    return X_train, y_train, feature_cols
+
+
+def load_test_data(feature_cols):
+    """Load molecular features and xTB gap values for the test set."""
+    log_section("LOAD TEST DATA")
+
+    logger.info("Loading features...")
+    df_features = pd.read_parquet(FEATURES_PARQUET)
+
+    logger.info("Loading test molecule IDs...")
+    df_test = pd.read_csv(TEST_CSV)
+    test_ids = set(df_test['mol_id'].values)
+    logger.info(f"Test molecules: {len(test_ids)}")
+
+    logger.info("Loading gap values...")
+    df_gaps = pd.read_csv(TEST_GAP_CSV)
+    df_gaps_success = df_gaps[df_gaps['status'] == 'success'].copy()
+    logger.info(f"Successful gaps: {len(df_gaps_success)}")
+
+    logger.info("Filtering to test molecules...")
+    df_test_features = df_features[['mol_id'] + feature_cols]
+    df_test_features = df_test_features[df_test_features['mol_id'].isin(test_ids)].copy()
+
+    logger.info("Merging features with gap values...")
+    df_merged = df_test_features.merge(
+        df_gaps_success[['mol_id', 'HOMO_LUMO_gap_eV']],
+        on='mol_id',
+        how='inner'
+    )
+
+    X_test = df_merged[feature_cols].values
+    y_test = df_merged['HOMO_LUMO_gap_eV'].values
+
+    logger.info(f"Test set: {X_test.shape[0]} molecules x {X_test.shape[1]} features")
+    logger.info(f"Gap range: {y_test.min():.4f} - {y_test.max():.4f} eV")
+
+    return X_test, y_test
+
+
+def normalize_features(X_train, X_test):
+    """Clean up and standardize the feature matrices before training."""
+    log_section("NORMALIZE FEATURES")
+
+    logger.info("Converting to float64...")
+    X_train = X_train.astype(np.float64)
+    X_test = X_test.astype(np.float64)
+
+    logger.info("Handling infinity values...")
+    X_train = np.where(np.isinf(X_train), np.nan, X_train)
+    X_test = np.where(np.isinf(X_test), np.nan, X_test)
+
+    train_nan = np.isnan(X_train).sum()
+    test_nan = np.isnan(X_test).sum()
+    logger.info(f"Found {train_nan} NaN in training, {test_nan} NaN in test")
+
+    if train_nan > 0 or test_nan > 0:
+        logger.info("Replacing NaN values with column median...")
+        for col in range(X_train.shape[1]):
+            col_data = X_train[:, col]
+            col_median = np.nanmedian(col_data)
+            if np.isnan(col_median):
+                col_median = 0.0
+            X_train[np.isnan(X_train[:, col]), col] = col_median
+            X_test[np.isnan(X_test[:, col]), col] = col_median
+
+    train_max = np.max(np.abs(X_train))
+    test_max = np.max(np.abs(X_test))
+    logger.info(f"Max absolute value - train: {train_max:.2e}, test: {test_max:.2e}")
+
+    if train_max > 1e6 or test_max > 1e6:
+        logger.info("Clipping very large values to [-1e6, 1e6]...")
+        X_train = np.clip(X_train, -1e6, 1e6)
+        X_test = np.clip(X_test, -1e6, 1e6)
+
+    logger.info("Fitting StandardScaler...")
+    scaler = StandardScaler()
+    X_train_scaled = scaler.fit_transform(X_train)
+    X_test_scaled = scaler.transform(X_test)
+
+    logger.info(f"Train shape: {X_train_scaled.shape}")
+    logger.info(f"Test shape: {X_test_scaled.shape}")
+
+    return X_train_scaled, X_test_scaled, scaler
+
+
+def train_models(X_train, y_train, X_test, y_test):
+    """Train each available model and record its performance on the test set."""
+    log_section("TRAINING MODELS")
+
+    results = {}
+
+    logger.info("Training RandomForest...")
+    rf = RandomForestRegressor(
+        n_estimators=200,
+        max_depth=20,
+        min_samples_split=5,
+        min_samples_leaf=2,
+        random_state=42,
+        n_jobs=-1,
+        verbose=0
+    )
+    rf.fit(X_train, y_train)
+    y_pred_train = rf.predict(X_train)
+    y_pred_test = rf.predict(X_test)
+
+    r2_train = r2_score(y_train, y_pred_train)
+    r2_test = r2_score(y_test, y_pred_test)
+    rmse_test = np.sqrt(mean_squared_error(y_test, y_pred_test))
+    mae_test = mean_absolute_error(y_test, y_pred_test)
+
+    logger.info(f"  R2 train: {r2_train:.4f} | R2 test: {r2_test:.4f}")
+    logger.info(f"  RMSE: {rmse_test:.4f} eV | MAE: {mae_test:.4f} eV")
+
+    results['RandomForest'] = {
+        'model': rf, 'r2_train': r2_train, 'r2_test': r2_test,
+        'rmse': rmse_test, 'mae': mae_test
+    }
+
+    if XGBOOST_AVAILABLE:
+        logger.info("Training XGBoost...")
+        xgb_model = xgb.XGBRegressor(
+            n_estimators=200,
+            max_depth=7,
+            learning_rate=0.1,
+            subsample=0.8,
+            colsample_bytree=0.8,
+            random_state=42,
+            verbosity=0
+        )
+        xgb_model.fit(X_train, y_train)
+        y_pred_train = xgb_model.predict(X_train)
+        y_pred_test = xgb_model.predict(X_test)
+
+        r2_train = r2_score(y_train, y_pred_train)
+        r2_test = r2_score(y_test, y_pred_test)
+        rmse_test = np.sqrt(mean_squared_error(y_test, y_pred_test))
+        mae_test = mean_absolute_error(y_test, y_pred_test)
+
+        logger.info(f"  R2 train: {r2_train:.4f} | R2 test: {r2_test:.4f}")
+        logger.info(f"  RMSE: {rmse_test:.4f} eV | MAE: {mae_test:.4f} eV")
+
+        results['XGBoost'] = {
+            'model': xgb_model, 'r2_train': r2_train, 'r2_test': r2_test,
+            'rmse': rmse_test, 'mae': mae_test
+        }
+
+    if LIGHTGBM_AVAILABLE:
+        logger.info("Training LightGBM...")
+        lgb_model = lgb.LGBMRegressor(
+            n_estimators=200,
+            max_depth=7,
+            learning_rate=0.1,
+            num_leaves=31,
+            subsample=0.8,
+            colsample_bytree=0.8,
+            random_state=42,
+            verbose=-1
+        )
+        lgb_model.fit(X_train, y_train)
+        y_pred_train = lgb_model.predict(X_train)
+        y_pred_test = lgb_model.predict(X_test)
+
+        r2_train = r2_score(y_train, y_pred_train)
+        r2_test = r2_score(y_test, y_pred_test)
+        rmse_test = np.sqrt(mean_squared_error(y_test, y_pred_test))
+        mae_test = mean_absolute_error(y_test, y_pred_test)
+
+        logger.info(f"  R2 train: {r2_train:.4f} | R2 test: {r2_test:.4f}")
+        logger.info(f"  RMSE: {rmse_test:.4f} eV | MAE: {mae_test:.4f} eV")
+
+        results['LightGBM'] = {
+            'model': lgb_model, 'r2_train': r2_train, 'r2_test': r2_test,
+            'rmse': rmse_test, 'mae': mae_test
+        }
+
+    if CATBOOST_AVAILABLE:
+        logger.info("Training CatBoost...")
+        cb_model = cb.CatBoostRegressor(
+            iterations=200,
+            depth=7,
+            learning_rate=0.1,
+            subsample=0.8,
+            random_state=42,
+            verbose=False
+        )
+        cb_model.fit(X_train, y_train)
+        y_pred_train = cb_model.predict(X_train)
+        y_pred_test = cb_model.predict(X_test)
+
+        r2_train = r2_score(y_train, y_pred_train)
+        r2_test = r2_score(y_test, y_pred_test)
+        rmse_test = np.sqrt(mean_squared_error(y_test, y_pred_test))
+        mae_test = mean_absolute_error(y_test, y_pred_test)
+
+        logger.info(f"  R2 train: {r2_train:.4f} | R2 test: {r2_test:.4f}")
+        logger.info(f"  RMSE: {rmse_test:.4f} eV | MAE: {mae_test:.4f} eV")
+
+        results['CatBoost'] = {
+            'model': cb_model, 'r2_train': r2_train, 'r2_test': r2_test,
+            'rmse': rmse_test, 'mae': mae_test
+        }
+
+    if NEURAL_AVAILABLE:
+        logger.info("Training Neural Network (hidden layers: 256, 128, 64)...")
+        nn_model = MLPRegressor(
+            hidden_layer_sizes=(256, 128, 64),
+            activation='relu',
+            max_iter=1000,
+            learning_rate_init=0.001,
+            random_state=42,
+            early_stopping=True,
+            validation_fraction=0.1,
+            verbose=0
+        )
+        nn_model.fit(X_train, y_train)
+        y_pred_train = nn_model.predict(X_train)
+        y_pred_test = nn_model.predict(X_test)
+
+        r2_train = r2_score(y_train, y_pred_train)
+        r2_test = r2_score(y_test, y_pred_test)
+        rmse_test = np.sqrt(mean_squared_error(y_test, y_pred_test))
+        mae_test = mean_absolute_error(y_test, y_pred_test)
+
+        logger.info(f"  R2 train: {r2_train:.4f} | R2 test: {r2_test:.4f}")
+        logger.info(f"  RMSE: {rmse_test:.4f} eV | MAE: {mae_test:.4f} eV")
+
+        results['NeuralNetwork'] = {
+            'model': nn_model, 'r2_train': r2_train, 'r2_test': r2_test,
+            'rmse': rmse_test, 'mae': mae_test
+        }
+    else:
+        logger.info("Neural network not available (sklearn MLPRegressor missing)")
+
+    return results
+
+
+def select_best_model(results):
+    """Compare all trained models and pick the one with the highest test R²."""
+    log_section("MODEL COMPARISON")
+
+    logger.info(f"{'Model':<20} {'R2 Train':<12} {'R2 Test':<12} {'RMSE':<12} {'MAE':<12}")
+    logger.info("-"*70)
+
+    best_model_name = None
+    best_r2 = -np.inf
+
+    for name in sorted(results.keys()):
+        data = results[name]
+        r2 = data['r2_test']
+
+        if r2 > best_r2:
+            best_r2 = r2
+            best_model_name = name
+
+        logger.info(f"{name:<20} {data['r2_train']:<12.4f} {r2:<12.4f} {data['rmse']:<12.4f} {data['mae']:<12.4f}")
+
+    logger.info("-"*70)
+    logger.info(f"Best model: {best_model_name} (R2 = {best_r2:.4f})")
+
+    return best_model_name, results[best_model_name]
+
+
+def save_all_models(results, scaler):
+    """Save every trained model and the feature scaler to disk."""
+    log_section("SAVE MODELS")
+
+    for model_name, data in results.items():
+        model = data['model']
+        model_file = RESULTS_DIR / f"{model_name}_model.pkl"
+
+        with open(model_file, 'wb') as f:
+            pickle.dump(model, f)
+        logger.info(f"Saved: {model_file}")
+
+    scaler_file = RESULTS_DIR / "feature_scaler.pkl"
+    with open(scaler_file, 'wb') as f:
+        pickle.dump(scaler, f)
+    logger.info(f"Saved: {scaler_file}")
+
+
+def save_training_metrics(results, feature_names):
+    """Save a summary of every model's metrics as JSON."""
+    log_section("SAVE TRAINING METRICS")
+
+    metrics_data = {
+        'timestamp': datetime.now().isoformat(),
+        'training_set_size': 4000,
+        'test_set_size': 1000,
+        'feature_count': len(feature_names),
+        'models': {}
+    }
+
+    best_model_name = max(results.keys(), key=lambda k: results[k]['r2_test'])
+    metrics_data['best_model'] = best_model_name
+
+    for name, data in sorted(results.items()):
+        metrics_data['models'][name] = {
+            'r2_train': float(data['r2_train']),
+            'r2_test': float(data['r2_test']),
+            'rmse_test': float(data['rmse']),
+            'mae_test': float(data['mae'])
+        }
+
+    with open(TRAINING_LOG, 'w') as f:
+        json.dump(metrics_data, f, indent=2)
+
+    logger.info(f"Saved: {TRAINING_LOG}")
 
 
 def main():
-    start_time = datetime.now()
-    logger.info(f"Start time: {start_time.strftime('%Y-%m-%d %H:%M:%S')}")
-    log_section("SELECT 11,000 MOLECULES FOR xTB VALIDATION")
+    log_section("ML MODEL TRAINING")
+    logger.info(f"Start time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
-    try:
-        features_df, screening_df = load_features_and_ids()
-        model = load_lightgbm_model()
+    X_train, y_train, feature_cols = load_training_data()
+    X_test, y_test = load_test_data(feature_cols)
 
-        predictions = predict_all_molecules(model, features_df)
+    X_train_scaled, X_test_scaled, scaler = normalize_features(X_train, X_test)
 
-        selected_df, selection_stats = select_stratified(features_df, screening_df, predictions)
+    results = train_models(X_train_scaled, y_train, X_test_scaled, y_test)
 
-        output_df = prepare_output(selected_df, screening_df)
+    best_model_name, best_result = select_best_model(results)
 
-        output_file, stats_file = save_results(output_df, selection_stats)
+    save_all_models(results, scaler)
+    save_training_metrics(results, feature_cols)
 
-        create_visualizations(output_df, predictions, selection_stats)
-
-        log_section("SELECTION COMPLETE")
-        logger.info(f"Selected {len(output_df)} molecules")
-        logger.info(f"Output saved to: {SELECTION_DIR}")
-
-        end_time = datetime.now()
-        logger.info(f"End time: {end_time.strftime('%Y-%m-%d %H:%M:%S')}")
-        logger.info(f"Duration: {end_time - start_time}")
-
-    except Exception as e:
-        logger.error(f"Error: {str(e)}", exc_info=True)
-        sys.exit(1)
+    log_section("TRAINING COMPLETE")
+    logger.info(f"End time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    logger.info("Models trained:")
+    for name in sorted(results.keys()):
+        logger.info(f"  - {name}")
+    logger.info(f"Best model: {best_model_name}")
+    logger.info(f"  R2:   {best_result['r2_test']:.4f}")
+    logger.info(f"  RMSE: {best_result['rmse']:.4f} eV")
+    logger.info(f"  MAE:  {best_result['mae']:.4f} eV")
 
 
 if __name__ == "__main__":

@@ -1,0 +1,11 @@
+range,role,target,selected,filled,final_selected
+0.70-0.80,Lower boundary learning,1100,1100,0,1100
+0.80-0.90,Safe zone (high confidence),1100,1100,0,1100
+0.90-1.00,Safe zone,1100,1100,1544,2644
+1.00-1.10,Safe zone (peak),1100,1100,1365,2465
+1.10-1.20,Safe zone (peak),1100,1100,1039,2139
+1.20-1.30,Safe zone,1100,1100,193,1293
+1.30-1.40,Safe zone,1100,254,0,254
+1.40-1.50,Safe zone,1100,5,0,5
+1.50-1.65,Good confidence,1100,0,0,0
+1.65-1.75,Upper boundary learning,1100,0,0,0

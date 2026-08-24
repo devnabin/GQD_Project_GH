@@ -14,7 +14,7 @@ Running each conversion in its own process means one bad molecule only
 kills that one worker's task, not the whole batch.
 
 Usage:
-  python 02_mol_to_xyz_conversion.py --test 100    # try it on 100 files first
+  python 02_mol_to_xyz_conversion.py --test 100000  --workers 4  # try it on 100 files first
 
 Re-running the same command will skip molecules that were already
 converted and only process what's left.

@@ -12,7 +12,7 @@ Input:
   - 11000_selected_molecules.csv (selected molecule_id, range, predicted_gap)
 
 Output:
-  - 11000_selected_molecules_with_filenames.csv
+  - detailed_results.csv
     (mol_id, molecule_filename, range, predicted_gap)
 
 Usage:
@@ -23,10 +23,10 @@ import pandas as pd
 from pathlib import Path
 import sys
 
-PROJECT_DIR = Path.home() / "GQD_Project"
+PROJECT_DIR = Path(__file__).resolve().parent.parent
 SCREENING_CSV = PROJECT_DIR / "data/train_test_split/screening_molecules.csv"
 SELECTED_CSV = PROJECT_DIR / "selection/11000_selected_molecules.csv"
-OUTPUT_CSV = PROJECT_DIR / "selection/11000_selected_molecules_with_filenames.csv"
+OUTPUT_CSV = PROJECT_DIR / "selection/detailed_results.csv"
 
 print("="*80)
 print("MAPPING SELECTED MOLECULE INDICES TO ORIGINAL FILENAMES")

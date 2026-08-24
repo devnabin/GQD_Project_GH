@@ -7,7 +7,7 @@ using the same xTB settings as the initial 4,000/1,000 run. Results are
 checkpointed periodically so the run can be resumed if interrupted.
 
 Input:
-  - 11000_selected_molecules_with_filenames.csv
+  - detailed_results.csv
   - Molecule files (xyz or mol) from the screening set
 
 Output:

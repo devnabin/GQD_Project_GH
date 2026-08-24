@@ -9,7 +9,7 @@ by RDKit, correct ring count, sp2 fraction, synthetic accessibility score,
 and uniqueness) before being accepted.
 
 Usage:
-  python 01_structure_generation.py --target 100000
+  python 01_structure_generation.py --target 100000  --save_images
 
 Resuming:
   Re-running the same command will pick up from the existing output CSV
@@ -70,9 +70,14 @@ RANDOM_SEED = args.seed
 CHECKPOINT  = args.checkpoint
 MAX_ATTEMPTS = TARGET * args.max_attempts_mult
 
-OUT_CSV    = "hex_lattice_structures.csv"
-OUT_MOLS   = "mol_files"
-OUT_IMAGES = "structure_images"
+# Output goes into the parent folder of wherever this script lives,
+# so it works the same whether you run it from Scripts/ or elsewhere.
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.path.dirname(SCRIPT_DIR)
+
+OUT_CSV    = os.path.join(PROJECT_ROOT, "hex_lattice_structures.csv")
+OUT_MOLS   = os.path.join(PROJECT_ROOT, "mol_files")
+OUT_IMAGES = os.path.join(PROJECT_ROOT, "structure_images")
 
 os.makedirs(OUT_MOLS, exist_ok=True)
 if args.save_images:
