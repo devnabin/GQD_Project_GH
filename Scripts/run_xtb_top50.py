@@ -40,7 +40,9 @@ LOGS_DIR = RESULTS_DIR / "molecule_logs"
 OUTPUT_CSV = RESULTS_DIR / "top_50_xtb_results.csv"
 
 XTB_METHOD = "--opt loose --gfn 2 --norestart --json"
-XTB_TIMEOUT = 600
+XTB_TIMEOUT = 900  
+OMP_NUM_THREADS = "1"      
+OMP_STACKSIZE = "4G"      
 
 RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 LOGS_DIR.mkdir(parents=True, exist_ok=True)
@@ -55,8 +57,9 @@ def run_xtb_single(mol_info):
     mol_work_dir.mkdir(parents=True, exist_ok=True)
 
     try:
+        os.environ['OMP_NUM_THREADS'] = OMP_NUM_THREADS
+        os.environ['OMP_STACKSIZE'] = OMP_STACKSIZE
         shutil.copy(xyz_path, mol_work_dir / xyz_filename)
-
         original_dir = os.getcwd()
         os.chdir(mol_work_dir)
 
@@ -64,7 +67,7 @@ def run_xtb_single(mol_info):
             cmd = f"xtb {xyz_filename} {XTB_METHOD}"
             result = subprocess.run(
                 cmd, shell=True, capture_output=True, text=True,
-                timeout=XTB_TIMEOUT
+                timeout=XTB_TIMEOUT, env=os.environ.copy()
             )
 
             if result.returncode != 0:
