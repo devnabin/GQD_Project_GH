@@ -1,0 +1,2 @@
+Structure_Name,SMILES,InChIKey,N_Hex,SP2,SA_Score
+gqd_agent_000001,c1ccc2c(c1)ccc1cc3c(cc12)cc1c2ccccc2cc2c4cc5cc6ccccc6c6c7cc8cc9cc%10c%11ccccc%11cc%11ccc%12cc%13cc%14cc%15cc(c3c12)c4c(c56)c%15c7c%14c8c%13c9c%12c%11%10,YHDAJUSMJHTTIK-UHFFFAOYSA-N,21,1.0,3.486
