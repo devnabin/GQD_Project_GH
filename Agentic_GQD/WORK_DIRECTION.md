@@ -2,7 +2,7 @@
 
 # Work Direction
 
-> Start here when resuming work. Full details: `Final_Planning.md`. Fine-tuning data plan: `AGENTS.MD`.
+> Start here when resuming work. Latest session notes: `SESSION_LOG.md` (top entry). Full details: `Final_Planning.md`. Fine-tuning data plan: `AGENTS.MD`.
 > Each stage has its own folder (`Stage1/`, `Stage2/`, …) with a `README.md` and its files.
 > Update the **Status** column and **Next steps** whenever a stage moves forward.
 
@@ -70,20 +70,20 @@ All Stage 2 files are in `Stage2/` (see `Stage2/README.md`).
 
 ## Stage 2d results (2026-11-11)
 
-All files are in `Stage2d/` (see `Stage2d/README.md`).
+All files are in `Stage2d/` (see `Stage2d/README.md`). Stable state before the improvement: git tag `stable-stage2d-2026-11-11` + `snapshots/`.
 
-- 50 LLM requests: **46% valid on the first try, 64% after up to 2 retries**. All valid designs are new compared with the 91k dataset; none have holes.
-- **Every failure** (except one RDKit re-read case) is an open-shell structure caused by **sublattice imbalance**. Triangular and L-shaped pieces fail most. The LLM handles size, connectivity and the other checks well.
-- Retries barely help, because "no Kekulé form" isn't actionable.
+- First run: only 46% valid on the first try, 64% after retries. Almost every failure was an **open-shell** structure (sublattice imbalance), which the LLM can't see.
+- **Improved:** (1) rejections now give the imbalance plus verified fix edits (`Stage1/gqd_hex.py`); (2) the prompt teaches the closed-shell rule + point-symmetry tip (`HEXAGON_RULES` in `studio/agent.py`).
+- Ablation (80 requests each): valid after retries **52% (before) → 90% (fixes) → 82% (rule) → 99% (both, now in the agent)**; first try 34% → 57%.
+- Trade-off: the rule prompt reduces variety (one design repeated 9×/80). The uniqueness check and Stage 3 parent edits should handle it.
 
 ## Next steps
 
-1. **Actionable open-shell feedback:** report the A/B imbalance and list single-hexagon edits that make the structure closed-shell; rerun Stage 2d to measure the gain.
-2. **Decisions needed before Stage 3:**
+1. **Decisions needed before Stage 3:**
    - **Goal:** minimise, maximise, or hit a target gap? (Data spans 0.00–2.03 eV.)
    - **Uniqueness:** must new GQDs also be new compared with the 91k dataset? (Recommended: yes.)
    - **Holes:** reject them with a 6th validation check (recommended; the predictor is 4× worse on them) or allow them with forced xTB verification?
-3. **Stage 3:** evolution loop using `GapPredictor` for scoring and xTB for the top candidates, logging all fields from `AGENTS.MD`.
+2. **Stage 3:** evolution loop using `GapPredictor` for scoring and xTB for the top candidates, the same fix feedback for edits, logging all fields from `AGENTS.MD`.
 
 ## Current state of the code (as of 2026-11-10)
 

@@ -210,13 +210,30 @@ llm = AzureChatOpenAI(
 # One tool call per turn: the validation nodes check the latest tool result only.
 llm_with_tools = llm.bind_tools(tools, parallel_tool_calls=False)
 
+# How to write a valid hexagon list (also used by the Stage 2d test).
+HEXAGON_RULES = (
+    "Hexagon rules: each hexagon is [q, r] in axial coordinates; the six neighbours of [q, r] are "
+    "[q+1, r], [q-1, r], [q, r+1], [q, r-1], [q+1, r-1], [q-1, r+1]. "
+    f"All hexagons must form one connected piece, with no duplicates, {MIN_HEX}-{MAX_HEX} hexagons. "
+    "The GQD must be closed-shell: its carbon atoms form two alternating sets (sublattices) that must be "
+    "equal in number. Triangular shapes, L-shaped corners and long zigzag edges usually break this and are "
+    "rejected as open-shell. A reliable way to stay closed-shell is a point-symmetric shape: pick a centre "
+    "and, for every [q, r] in the list, also include [a-q, b-r] (for example with a = b = 0, [2, -1] needs "
+    "[-2, 1]). If a requested shape cannot be closed-shell, build the closest closed-shell variant. "
+    "If a design is rejected, the message explains why and lists edits that fix it."
+)
+
 # System message
 sys_msg = SystemMessage(content=(
     "You are a helpful assistant tasked with generate GQD, validate software and environment. "
     "To design a GQD yourself, call build_gqd_from_hexagons with hexagon coordinates (never write SMILES). "
+    + HEXAGON_RULES + " "
     "Call one tool at a time. "
+    "If a design you made is rejected, fix it yourself using the rejection message (for example apply one "
+    "of the suggested edits) and call the tool again, without asking the user; give up after 3 rejected "
+    "attempts for the same request and report why. "
     "Each generated GQD is validated automatically and then accepted or rejected. "
-    "Report the result to the user; only generate another GQD if the user asked for more."
+    "Once a GQD is accepted, report it to the user; only design another new GQD if the user asked for more."
 ))
 
 # Node
@@ -255,3 +272,4 @@ builder.add_edge("save_gqd", "assistant")
 
 # Compile graph
 graph = builder.compile()
+

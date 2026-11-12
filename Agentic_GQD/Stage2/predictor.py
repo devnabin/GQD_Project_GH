@@ -56,6 +56,10 @@ class GapPredictor:
     def predict(self, smiles=None, hexagons=None) -> pd.DataFrame:
         if (smiles is None) == (hexagons is None):
             raise ValueError("give exactly one of smiles= or hexagons=")
+        if isinstance(smiles, str):
+            smiles = [smiles]  # one SMILES given
+        if hexagons is not None and len(hexagons) and isinstance(hexagons[0][0], (int, np.integer)):
+            hexagons = [hexagons]  # one structure given, e.g. [[0, 0], [1, 0], ...]
         items = smiles if smiles is not None else hexagons
         rows, valid = [], []
         for item in items:

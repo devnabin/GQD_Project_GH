@@ -61,8 +61,12 @@ def check_hexagons(hexagons) -> list[tuple[int, int]]:
     return cells
 
 
-def hex_to_mol(hexagons) -> Chem.Mol:
-    """Build an aromatic all-carbon molecule from hexagon coordinates."""
+def hex_to_mol(hexagons, feedback: bool = True, size_range: tuple[int, int] = (20, 40)) -> Chem.Mol:
+    """Build an aromatic all-carbon molecule from hexagon coordinates.
+
+    feedback=True: an open-shell rejection explains the sublattice imbalance and
+    lists hexagon edits (within size_range) that make the structure closed-shell.
+    """
     cells = check_hexagons(hexagons)
 
     corner_index: dict[frozenset, int] = {}
@@ -84,7 +88,7 @@ def hex_to_mol(hexagons) -> Chem.Mol:
     # atom order, even when a valid Kekulé structure exists.
     double_bonds = _kekule_double_bonds(len(corner_index), bonds)
     if double_bonds is None:
-        raise HexError("structure has no Kekulé form (open-shell / radical GQD)")
+        raise HexError(open_shell_feedback(cells, size_range) if feedback else OPEN_SHELL)
 
     mol = Chem.RWMol()
     for _ in corner_index:
@@ -147,6 +151,126 @@ def _kekule_double_bonds(n_atoms: int, bonds: set[tuple[int, int]]) -> set[tuple
         if not augment(atom, set()):
             return None
     return {tuple(sorted((atom, partner[atom]))) for atom in left}
+
+
+# ---------------------------------------------------------------------------
+# Open-shell diagnosis and repair suggestions
+#
+# The carbon atoms of a hexagon flake form two alternating sets (sublattices
+# A and B): every bond joins an A atom to a B atom. A closed-shell structure
+# pairs every atom with a neighbour by a double bond, which needs #A == #B
+# (and, rarely, a bit more). Shapes such as triangles and L-shapes have extra
+# atoms on one sublattice, so they must be radicals (Lieb's theorem).
+# Corner {h1, h2, h3} is on sublattice A when sum(q + r) over its hexagons is 1 (mod 3).
+# Point inversion [q, r] -> [a - q, b - r] swaps A and B, so point-symmetric
+# shapes always have #A == #B.
+# ---------------------------------------------------------------------------
+OPEN_SHELL = "structure has no Kekulé form (open-shell / radical GQD)"
+
+
+def sublattice_counts(hexagons) -> tuple[int, int]:
+    """Number of carbon atoms on sublattice A and on sublattice B."""
+    corners = {corner(q, r) for q, r in hexagons for corner in VERT_FNS}
+    n_a = sum(sum(q + r for q, r in corner) % 3 == 1 for corner in corners)
+    return n_a, len(corners) - n_a
+
+
+def is_closed_shell(hexagons) -> bool:
+    """True if the hexagon set has a Kekulé structure (assumes a valid, connected set)."""
+    n_a, n_b = sublattice_counts(hexagons)
+    if n_a != n_b:
+        return False
+    corner_index: dict[frozenset, int] = {}
+    bonds = set()
+    for q, r in hexagons:
+        ring = [corner_index.setdefault(corner(q, r), len(corner_index)) for corner in VERT_FNS]
+        bonds |= {tuple(sorted((ring[i], ring[(i + 1) % 6]))) for i in range(6)}
+    return _kekule_double_bonds(len(corner_index), bonds) is not None
+
+
+def _is_connected(cells: frozenset) -> bool:
+    if not cells:
+        return False
+    start = next(iter(cells))
+    seen, queue = {start}, deque([start])
+    while queue:
+        q, r = queue.popleft()
+        for dq, dr in HEX_DIR:
+            neighbor = (q + dq, r + dr)
+            if neighbor in cells and neighbor not in seen:
+                seen.add(neighbor)
+                queue.append(neighbor)
+    return len(seen) == len(cells)
+
+
+def _single_edits(cells: frozenset, size_range):
+    """Yield (edit_text, new_cells) for every add/remove of one hexagon that keeps a valid shape."""
+    low, high = size_range
+    if len(cells) + 1 <= high:
+        empty = {(q + dq, r + dr) for q, r in cells for dq, dr in HEX_DIR} - cells
+        for cell in sorted(empty):
+            yield f"ADD [{cell[0]}, {cell[1]}]", cells | {cell}
+    if len(cells) - 1 >= low:
+        for cell in sorted(cells):
+            rest = cells - {cell}
+            if _is_connected(rest):
+                yield f"REMOVE [{cell[0]}, {cell[1]}]", rest
+
+
+def open_shell_fixes(hexagons, size_range=(20, 40), max_edits: int = 8, beam: int = 30, max_options: int = 6):
+    """Find hexagon edits that make an open-shell structure closed-shell.
+
+    Returns (single, multi):
+      single: up to max_options single edits that each give a closed-shell structure
+      multi:  if no single edit works, the shortest edit sequence found (beam search
+              on |#A - #B|), or [] if none found within max_edits
+    """
+    cells = frozenset(map(tuple, hexagons))
+    size_range = (min(size_range[0], len(cells)), max(size_range[1], len(cells)))
+
+    def imbalance(shape):
+        n_a, n_b = sublattice_counts(shape)
+        return abs(n_a - n_b)
+
+    single = [text for text, shape in _single_edits(cells, size_range) if is_closed_shell(shape)]
+    if single:
+        return single[:max_options], []
+
+    frontier, seen = [((), cells)], {cells}
+    for _ in range(max_edits):
+        candidates = []
+        for path, shape in frontier:
+            for text, new in _single_edits(shape, size_range):
+                if new in seen:
+                    continue
+                seen.add(new)
+                if is_closed_shell(new):
+                    return [], list(path) + [text]
+                candidates.append((imbalance(new), len(candidates), path + (text,), new))
+        candidates.sort(key=lambda item: item[:2])
+        frontier = [(path, shape) for _, _, path, shape in candidates[:beam]]
+    return [], []
+
+
+def open_shell_feedback(hexagons, size_range=(20, 40)) -> str:
+    """Rejection message for an open-shell structure: the cause plus concrete fixes."""
+    cells = [tuple(cell) for cell in hexagons]
+    n_a, n_b = sublattice_counts(cells)
+    if n_a != n_b:
+        cause = (f"its carbon atoms form two alternating sets (sublattices) that must be equal in size, "
+                 f"but here they are {max(n_a, n_b)} vs {min(n_a, n_b)} ({abs(n_a - n_b)} unpaired atom(s); "
+                 "typical causes: triangular parts, L-shaped corners, long zigzag edges)")
+    else:
+        cause = "the sublattices are equal in size, but one region of the shape cannot be paired with double bonds"
+    single, multi = open_shell_fixes(cells, size_range)
+    if single:
+        fix = "Single-hexagon edits that each make it closed-shell: " + "; ".join(single) + "."
+    elif multi:
+        fix = "No single edit fixes it. Shortest fix found: " + " + ".join(multi) + "."
+    else:
+        fix = "No small fix was found; redesign the shape."
+    tip = "Tip: point-symmetric shapes (every [q, r] has a partner [a-q, b-r] for one fixed a, b) are always balanced."
+    return f"{OPEN_SHELL}: {cause}. {fix} {tip}"
 
 
 def mol_to_hex(mol: Chem.Mol) -> list[tuple[int, int]]:
@@ -237,5 +361,5 @@ def smiles_to_hex(smiles: str) -> list[tuple[int, int]]:
     return mol_to_hex(mol)
 
 
-def hex_to_smiles(hexagons) -> str:
-    return Chem.MolToSmiles(hex_to_mol(hexagons), canonical=True)
+def hex_to_smiles(hexagons, feedback: bool = True) -> str:
+    return Chem.MolToSmiles(hex_to_mol(hexagons, feedback=feedback), canonical=True)
