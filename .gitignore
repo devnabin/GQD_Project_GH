@@ -2,3 +2,6 @@
 **/.ipynb_checkpoints/
 *.pyc
 .DS_Store
+
+# Agentic_GQD is now its own repository: https://github.com/devnabin/agentic_gqd (2026-11-13)
+Agentic_GQD/

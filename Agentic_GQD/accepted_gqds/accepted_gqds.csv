@@ -1,5 +1,0 @@
-Structure_Name,SMILES,InChIKey,N_Hex,SP2,SA_Score
-gqd_agent_000001,c1ccc2c(c1)ccc1cc3c(cc12)cc1c2ccccc2cc2c4cc5cc6ccccc6c6c7cc8cc9cc%10c%11ccccc%11cc%11ccc%12cc%13cc%14cc%15cc(c3c12)c4c(c56)c%15c7c%14c8c%13c9c%12c%11%10,YHDAJUSMJHTTIK-UHFFFAOYSA-N,21,1.0,3.486
-gqd_agent_000002,c1cc2cc3c4cccc5cc6cc7cc8ccc9c%10ccc%11ccc%12c%13cccc%14c%15cccc%16c%17cc%18ccc%19c%20cc(c1)c2c1c3c2c(c54)c6c3c7c4c8c9c5c6c%10c%11c%12c7c(c%14%13)c(c%15%16)c8c%17c9c%18c%19c%10c(c%201)c2c3c1c4c5c(c9c%101)c8c76,QUTFGOYINQTWBT-UHFFFAOYSA-N,31,1.0,3.986
-gqd_agent_000003,c1cc2cc3cc4ccc5ccc6c7ccc8c9ccc%10ccc%11cc%12cc%13ccc%14ccc%15c%16ccc%17c%18ccc1c1c2c2c3c3c4c5c6c4c5c7c8c6c7c9c%10c%11c8c%12c9c%13c%14c%15c%10c%11c%16c%17c%12c(c%181)c2c(c34)c1c%12c%11c(c6c51)c(c9%10)c87,BQBXIXRXOONPAC-UHFFFAOYSA-N,31,1.0,3.697
-gqd_agent_000004,c1cc2cc3cc4ccc5c6ccc7cc8ccc9ccc%10cc%11c%12ccc%13cc%14ccc%15cc%16ccc%17cc%18c(c1)c2c1c3c2c4c5c3c4c6c7c5c8c9c%10c6c%11c7c8c%12c%13c9c%14c%15c%10c%16c%17c%11c%18c1c1c2c3c(c7c4c56)c2c8c9c%10c%11c12,PSKIJMQLOCHATR-UHFFFAOYSA-N,31,1.0,3.967
