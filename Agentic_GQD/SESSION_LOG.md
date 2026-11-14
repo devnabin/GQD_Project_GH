@@ -7,6 +7,17 @@
 
 ---
 
+## 2026-11-13 22:49 CST — Snapshot committed and pushed
+
+- Commit `58d7952` on branch `agentic-gqd`, tag `stable-stage4-start-2026-11-13`, pushed to GitHub. The user asked for it.
+  - 863 files, about 12.6 MB: Stages 3, 3a, 3c, 3d and 4, `novel_gqds/`, `tools/`, `Report/`, `server/`, the docs.
+  - Scanned before committing: no keys, no server hostname or username.
+  - The exported chat transcript is git-ignored and was not committed.
+- Snapshot: `snapshots/requirements_freeze_2026-11-13.txt` (pip freeze; `snapshots/` is git-ignored, kept locally).
+- Not included: the server-only results that are still running (score-v2 runs, DFT of the 8 candidates). Copy them back and commit them later.
+
+---
+
 ## 2026-11-13 (19:15) — Radical filter set; overnight queue running on the server
 
 - Broken-symmetry DFT done for all 12 benchmark GQDs: 5 closed-shell, 7 open-shell. xTB N_FOD separates them without error, so the threshold is **N_FOD ≤ 2.9**.

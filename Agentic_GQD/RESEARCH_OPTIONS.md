@@ -35,6 +35,7 @@ Every time the project reached a fork, the options are recorded here: the one we
 | D23 | Use a second AI model (Azure GPT) to cross-check our work | 11-13 | ✅ gpt-6.1-sol cross-checks facts and figures during research | Blind review of writing; second opinion on decisions; code review; several LLMs as designers (an experiment); not for checking chemistry facts | ❓ |
 | D24 | Where to collect the new GQDs found by the evolution loop | 11-13 | ✅ Separate novel-GQD library (`novel_gqds/`) | Separate novel-GQD library (recommended); append to accepted_gqds; leave in run logs | ✅ (11-13) |
 | D25 | Keep `accepted_gqds/` now that `novel_gqds/` exists? | 11-13 | Keep it (recommended) | Delete it; merge it into the library | ❓ |
+| D26 | Own repository and licence for the Agentic_GQD work | 11-13 | Not decided (ask the professor first) | New separate repo (recommended); restructure the current repo; keep as is | ❓ |
 
 ---
 
@@ -226,4 +227,16 @@ Details and test outputs: `Stage3d/PROGRESS.md`.
 - ❓ **Keep it** (recommended). It is the Studio agent's working output and tiny. Optionally add its 4 rows to the novel library with source "agent".
 - ❌ Delete it: the agent would recreate it on the next save, and the Stage 0 test record would be lost.
 - ⏸ Merge: make the agent save into the novel library instead. Possible when the agent is connected to the full workflow (one user-facing tool).
+
+## D26. Own repository and licence for the Agentic_GQD work (2026-11-13 22:53 CST)
+- The user's idea: make Agentic_GQD the main experiment and move the previous research (by Nagmani, the parent folder) into a `previous_research/` subfolder with credit, under the user's own repo and licence.
+- ❓ **A. A new separate repo** containing only Agentic_GQD, with its git history extracted (subdirectory filter). Recommended.
+  - The previous research stays in its own repo and is cited (README, `CITATION.cff`, acknowledgements).
+  - One licence, covering only the user's work.
+- ⏸ B. Restructure the current repo (`previous_research/` plus Agentic_GQD at the top). It mixes two authors' work, and the user cannot relicense the other author's code without permission.
+- ⏸ C. Keep as is and only add a top-level README explaining authorship.
+- Before any choice:
+  - ask the professor about university/lab IP rules, licence, public vs private (unpublished work, external collaborators);
+  - get permission to redistribute the previous author's 91k dataset and xTB data, or document how to obtain them.
+- Technical: parent-folder paths (xtb binary, source dataset for `Stage1/build_hex_dataset.py`) must become settings in a new repo.
 
