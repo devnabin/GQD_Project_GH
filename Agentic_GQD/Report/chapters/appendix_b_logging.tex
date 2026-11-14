@@ -1,0 +1,55 @@
+% Appendix B. Keep in line with the record written by Stage3/evolve.py (run_generation).
+\chapter{Logged fields of the evolutionary loop}
+\label{app:logging}
+
+Each line of \code{Stage3/results/<run>/children.jsonl} describes one proposed child, including
+rejected and skipped ones. The first group contains the fields required for the fine-tuning
+datasets; the others record the details needed to reproduce and analyse a run.
+
+\begin{table}[ht]
+  \centering
+  \caption{Fields of one child record.}
+  \label{tab:fields}
+  \small
+  \begin{tabularx}{\textwidth}{@{}lL@{}}
+    \toprule
+    Field & Meaning \\
+    \midrule
+    \multicolumn{2}{@{}l}{\emph{Required for the fine-tuning datasets}} \\
+    \code{generation} & generation number (1 to 10) \\
+    \code{goal} & the objective in words (maximise the \ce{NO2} sensing score) \\
+    \code{parent\_id}, \code{parent\_hexagons}, \code{parent\_score} & the parent and its score \\
+    \code{edit} & the edits, for example \code{ADD [-5, 1]; REMOVE [-5, 2]} \\
+    \code{reason} & the LLM's one-sentence reason (``random edit'' for the random mutator) \\
+    \code{child\_hexagons} & the child's hexagon list (after any repair) \\
+    \code{valid}, \code{reject\_reason} & whether the child passed all checks, and why not \\
+    \code{predicted\_gap} & gap predicted by the Stage 2 model (eV) \\
+    \code{xtb\_gap} & xTB gap of the optimised child (eV), if scored \\
+    \midrule
+    \multicolumn{2}{@{}l}{\emph{Loop bookkeeping}} \\
+    \code{run}, \code{mutator}, \code{child\_id}, \code{round} & run name, mutator, identifier, proposal round \\
+    \code{smiles}, \code{n\_hex} & canonical SMILES and number of hexagons \\
+    \code{repair} & the edit added by code to make an open-shell child closed-shell \\
+    \code{root} & the starting GQD of the child's family \\
+    \code{predicted\_gap\_sigma} & uncertainty of the predicted gap (eV) \\
+    \code{skip\_reason} & why a valid child was not scored (gap window or budget) \\
+    \code{evaluated} & whether the child was scored with xTB \\
+    \midrule
+    \multicolumn{2}{@{}l}{\emph{xTB results (scored children)}} \\
+    \code{E\_NO2\_eV}, \code{q\_NO2\_e}, \code{dmin\_NO2\_A} & \ce{NO2} adsorption energy, charge and shortest contact \\
+    \code{NO2\_chemisorbed}, \code{NO2\_site}, \code{NO2\_site\_cell} & bonded or not, and where \ce{NO2} binds best \\
+    \code{E\_CO\_eV}, \code{selectivity\_margin\_eV} & CO adsorption energy and the margin of \ce{NO2} over CO \\
+    \code{reversibility}, \code{charge\_to\_NO2\_e}, \code{sensing\_score} & the factors and the score \\
+    \code{all\_converged}, \code{xtb\_details}, \code{xtb\_seconds} & convergence, per-job results, run time \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+Each run folder also contains these files:
+\begin{itemize}
+  \item \code{config.json}: the settings and the system prompt;
+  \item \code{generations.jsonl}: one summary line per generation;
+  \item \code{llm\_log.jsonl}: every prompt and reply of the LLM mutator;
+  \item \code{summary.md}: a readable summary of the run;
+  \item \code{final\_check.csv}: the full check of the five best new GQDs.
+\end{itemize}

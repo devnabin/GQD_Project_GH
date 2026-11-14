@@ -1,0 +1,4 @@
+{"name": "llm_s0_g10c004", "E_RKS_eV": -120873.35012016166, "E_UKS_BS_eV": -120874.16651632449, "lowering_eV": 0.8163961628327644, "S2": 1.6653201727908709, "gap_RKS_eV": 2.910557716474908, "uks_converged": true, "seconds": 373}
+{"name": "random_s0_g02c004", "E_RKS_eV": -118863.61171874781, "E_UKS_BS_eV": -118864.29404144759, "lowering_eV": 0.6823226997718788, "S2": 1.4799929213018004, "gap_RKS_eV": 3.303186491735418, "uks_converged": true, "seconds": 354}
+{"name": "gqd_18941", "E_RKS_eV": -100083.16474530823, "E_UKS_BS_eV": -100083.59904371727, "lowering_eV": 0.4342984090531384, "S2": 1.670180272140442, "gap_RKS_eV": 3.530029820335501, "uks_converged": true, "seconds": 255}
+{"name": "gqd_88143", "E_RKS_eV": -98074.99844225866, "E_UKS_BS_eV": -98075.04174296689, "lowering_eV": 0.04330070823434199, "S2": 0.6150501783562277, "gap_RKS_eV": 4.507878253597289, "uks_converged": true, "seconds": 245}

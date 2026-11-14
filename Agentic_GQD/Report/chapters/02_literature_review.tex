@@ -1,0 +1,243 @@
+% Chapter 2. Add new references to ../references.bib; keep claims tied to a citation.
+\chapter{Background and literature review}
+\label{ch:literature}
+
+This chapter covers the background that the method relies on. \Cref{sec:lit-gqd,sec:lit-shell}
+describe GQDs and the closed-shell condition that every design must meet. \Cref{sec:lit-sensing}
+reviews gas sensing with graphene materials. \Cref{sec:lit-methods,sec:lit-ml} summarise the
+quantum-chemical and machine-learning methods used for scoring. \Cref{sec:lit-repr,sec:lit-design,sec:lit-llm}
+review molecular representations, computational molecular design and the use of LLMs in chemistry,
+and \cref{sec:lit-gap} states the gap that this thesis addresses.
+
+\section{Graphene and graphene quantum dots}
+\label{sec:lit-gqd}
+
+Graphene is a single layer of carbon atoms arranged in a honeycomb lattice \cite{novoselov2004}.
+Each carbon is \(sp^2\) hybridised and contributes one \(p_z\) electron to a delocalised \(\pi\)
+system. Infinite graphene has no band gap: its valence and conduction bands meet at the corners of
+the Brillouin zone \cite{castroneto2009}. When graphene is cut into a flake a few nanometres wide,
+the electrons are confined and a gap opens \cite{ponomarenko2008}. Such flakes are called graphene
+quantum dots \cite{bacon2014gqd}. With hydrogen on every edge carbon, a GQD is chemically a large
+polycyclic aromatic hydrocarbon (PAH), and in this thesis the two terms describe the same kind of
+molecule.
+
+GQDs are made in two ways. Top-down methods cut or oxidise larger carbon materials and give
+mixtures of sizes and edge structures. Bottom-up methods build the flake from small organic
+precursors and can give one exact structure \cite{yan2010large,narita2015nanographene}. Because
+bottom-up synthesis can reach defined shapes, a computational design that names an exact
+structure is a meaningful target.
+
+The gap of a GQD depends on more than its size. Graphene has two kinds of straight edge, armchair
+and zigzag. Zigzag edges carry electronic states localised at the edge with energies close to the
+middle of the gap \cite{nakada1996edge}. A flake with long zigzag edges therefore has a smaller
+gap and more reactive edge carbons than an armchair-edged flake of the same size. Shape also
+controls whether the flake has unpaired electrons, which is the subject of the next section.
+
+\section{Closed-shell and open-shell GQDs}
+\label{sec:lit-shell}
+
+The carbon atoms of a honeycomb lattice fall into two sublattices, A and B, and every
+carbon-carbon bond joins an A atom to a B atom. The carbon skeleton of a GQD is therefore a
+bipartite graph. A Kekul\'e structure, a pattern of alternating single and double bonds in which
+every carbon has exactly one double bond, corresponds to a perfect matching of this graph. A perfect
+matching can only exist if the two sublattices have the same number of atoms, \(N_A = N_B\)
+\cite{cyvin1988kekule}. Equal numbers are necessary but not sufficient; some balanced benzenoids
+still have no Kekul\'e structure \cite{cyvin1988kekule}.
+
+When \(N_A \neq N_B\), the molecule cannot be closed-shell. For the half-filled Hubbard model on a
+bipartite lattice, Lieb's theorem gives a ground-state spin of \(S = |N_A - N_B|/2\)
+\cite{lieb1989}, in line with Ovchinnikov's earlier rule for alternant hydrocarbons
+\cite{ovchinnikov1978}. Triangular flakes are the standard example. Their sublattice imbalance
+grows with size and they have a magnetic ground state
+\cite{fernandezrossier2007,wang2009topological}. Even among closed-shell structures, stability
+differs; Clar's aromatic sextet theory relates it to the number of disjoint benzene-like sextets
+that can be drawn \cite{clar1972sextet}.
+
+For design, the consequence is simple. A GQD without a Kekul\'e structure is a radical. It is
+reactive, hard to make and hard to describe with the closed-shell methods used for screening. The
+workflow in this thesis therefore accepts only GQDs that have a Kekul\'e structure, and it checks
+this condition with an exact matching algorithm (\cref{sec:hex}).
+
+\section{Gas sensing with graphene materials}
+\label{sec:lit-sensing}
+
+In a chemiresistive sensor, an adsorbed gas changes the carrier density of the sensing layer and
+therefore its resistance. \ce{NO2} is an electron acceptor. On graphene it withdraws electrons and
+dopes the layer p-type, which is the effect that allowed Schedin et al.\ to detect single
+molecules \cite{schedin2007detection}. First-principles calculations by Leenaerts et al.\ found that
+\ce{H2O}, \ce{NH3}, CO, \ce{NO2} and NO all physisorb weakly on pristine graphene, that \ce{NO2}
+is a strong acceptor, and that the amount of charge transferred depends on the orientation of the
+molecule \cite{leenaerts2008adsorption}. Dopants and defects strengthen the binding of several
+gases \cite{zhang2009dopants}, and reviews of graphene sensors describe the same balance between
+sensitivity, selectivity and recovery \cite{yuan2013graphene}.
+
+Recovery is the reverse problem. If a gas binds too strongly, it does not leave at room
+temperature and the sensor stays saturated. Computational studies often estimate the recovery time
+with transition-state theory as \(\tau = \nu^{-1}\exp(-\Eads/k_BT)\), with an attempt frequency
+\(\nu\) of about \(10^{12}\)~s\(^{-1}\) \cite{peng2004cnt}. Because \(\tau\) depends exponentially on
+the adsorption energy, a change of 0.1~eV in binding changes the recovery time by a factor of about
+50 at room temperature. Peng et al.\ used such estimates to explain the slow recovery observed for
+carbon-nanotube \ce{NO2} sensors \cite{peng2004cnt}.
+
+GQDs have been combined with metal oxides in \ce{NO2} sensors. Lee et al.\ decorated \ce{SnO2}
+nanodomes with GQDs and reported room-temperature detection with a limit of 1.1~ppb and good
+selectivity against other gases \cite{lee2023gqdsno2}. In such studies the GQDs come from
+solution synthesis and their exact structure is not controlled. We did not find studies that
+search over exact GQD structures for \ce{NO2} sensing. \authornote{Confirm this with a systematic
+search (Web of Science, Scopus, arXiv) before submission.}
+
+\section{Computational methods for adsorption}
+\label{sec:lit-methods}
+
+\paragraph{Density functional theory.}
+DFT is the standard method for adsorption energies and charge transfer in molecules of this size.
+Its main weakness for this problem is delocalisation error: approximate functionals spread charge
+too much, which favours fractional charge transfer and overbinds some radical and charge-transfer
+complexes \cite{cohen2008insights}. Range-separated hybrid functionals reduce this error. Weak
+binding of a gas to an aromatic surface is dominated by dispersion, so the functional also needs a
+dispersion term. \(\omega\)B97X-V is a range-separated hybrid that includes the VV10 nonlocal
+correlation functional for dispersion \cite{mardirossian2014wb97xv,vydrov2010vv10}, and it performs
+well in broad benchmarks of molecular energies \cite{bursch2022bestpractice}. Small basis sets such
+as def2-SVP \cite{weigend2005def2} make large systems affordable but cause basis set superposition
+error, which overbinds weak complexes unless a counterpoise correction is applied
+\cite{boys1970counterpoise}. Atomic charges are not observables, and their values depend on the
+partitioning scheme. In this work DFT charges are computed with meta-L\"owdin populations
+\cite{sun2014metalowdin}.
+
+\paragraph{Extended tight binding.}
+GFN2-xTB is a semiempirical tight-binding method parametrised for most of the periodic table. It
+includes multipole electrostatics and a density-dependent dispersion correction
+\cite{bannwarth2019gfn2,bannwarth2021xtb}. It is orders of magnitude faster than hybrid DFT and
+gives good geometries for organic molecules, which makes it suitable for screening. Its
+self-consistent charges come from a DFT-like model, so it is expected to share the tendency of
+simple functionals to over-delocalise charge. \Cref{sec:res-dft-small} tests this directly for
+\ce{NO2} and \ce{O2} on GQDs.
+
+\paragraph{GPU acceleration.}
+PySCF is an open-source Python framework for quantum chemistry
+\cite{sun2018pyscf,sun2020pyscf}. Its GPU extension, GPU4PySCF, computes the electron-repulsion
+integrals on the GPU; its authors report a speedup of about two orders of magnitude over
+multithreaded CPU Hartree-Fock on one NVIDIA A100 \cite{li2025gpu4pyscf}. This speedup is what makes
+the DFT benchmark in \cref{sec:e4} possible within a day.
+
+\section{Machine-learned property prediction}
+\label{sec:lit-ml}
+
+Fast predictors of quantum-chemical properties are often used to filter candidates before an
+expensive calculation. For conjugated hydrocarbons, H\"uckel theory \cite{huckel1931} gives a
+cheap estimate of the frontier orbital energies from the connectivity alone, and it is a natural
+physical baseline. Gradient-boosted trees such as XGBoost and LightGBM \cite{chen2016xgboost,ke2017lightgbm}
+work well on hand-made descriptors, and their hyperparameters can be tuned automatically, for
+example with Optuna \cite{akiba2019optuna}. Graph neural networks learn directly from the molecular
+graph \cite{gilmer2017mpnn}; the graph isomorphism network (GIN) is a simple and expressive variant
+\cite{xu2019gin}. Large datasets of PAHs exist. The COMPAS project, for example, published about
+34{,}000 cata-condensed PAHs computed with GFN2-xTB and about 9{,}000 with DFT, and compared the two
+levels of theory \cite{wahab2022compas}. Our predictor (\cref{sec:predictor}) uses a H\"uckel
+baseline, physics-based features, boosted trees and a GIN-style network.
+
+\section{Molecular representations for generation}
+\label{sec:lit-repr}
+
+Most generative methods write molecules as text or as graphs. SMILES encodes a molecule as a
+string of atoms, bonds, branches and ring-closure digits \cite{weininger1988smiles}. A single wrong
+character can make a SMILES string invalid, and large fused aromatic systems need many ring-closure
+digits that must be paired correctly. SELFIES was designed so that every string decodes to a
+molecule with valid valences \cite{krenn2020selfies}. Valid valences are not enough for GQDs,
+however: a SELFIES string can still decode to an open-shell or non-planar structure.
+
+For benzenoid hydrocarbons there is a more natural description. The carbon skeleton is fully
+defined by the set of hexagons it occupies on the honeycomb lattice, a structure known in chemical
+graph theory as a polyhex \cite{cyvin1988kekule}. In this description, connectivity, size and
+shape can be read directly from the list of hexagons, and a local change to the shape is a local
+change to the list. \Cref{sec:hex} uses this description as the language between the LLM and the
+code.
+
+\section{Computational molecular design}
+\label{sec:lit-design}
+
+Inverse design starts from a target property and searches for structures that have it
+\cite{sanchezlengeling2018inverse}. Three families of methods are common. Generative models such as
+variational autoencoders map molecules to a continuous space in which optimisation is easier
+\cite{gomezbombarelli2018vae}. Reinforcement learning trains a generator to maximise a reward;
+REINVENT is a widely used example \cite{olivecrona2017reinvent}. Genetic algorithms keep a
+population of candidates and improve it by mutation, crossover and selection; graph-based genetic
+algorithms are simple and strong baselines \cite{jensen2019graphga,nigam2020gad}.
+
+Benchmarks compare these methods. GuacaMol defined a set of goal-directed tasks
+\cite{brown2019guacamol}. The PMO benchmark later limited every method to a fixed number of
+calls to the objective function and showed that this budget changes the ranking of methods, with
+genetic algorithms and REINVENT among the strongest \cite{gao2022pmo}. A fixed budget matters even
+more in our setting, because each call to the objective is an xTB calculation of about a minute
+rather than a cheap cheminformatics function.
+
+Polycyclic aromatic systems and GQDs have their own design studies. GaUDI combined a diffusion
+model with a property predictor to generate polycyclic aromatic systems with targeted electronic
+properties \cite{weiss2023gaudi}. For GQDs, high-throughput time-dependent DFT on 284 structures
+of different shape, size and doping, combined with machine learning, gave design rules for their
+emission \cite{ozdemir2024gqd}, and Bayesian optimisation found the doped GQD with the strongest
+absorption among 63 candidates with only 12 TDDFT calculations \cite{ozonder2022bo}. These studies
+target optical properties, and none of them uses an LLM or addresses gas sensing.
+
+\section{Large language models in chemistry}
+\label{sec:lit-llm}
+
+\paragraph{What LLMs can do.}
+General-purpose LLMs answer many chemistry questions, but a benchmark of eight chemistry tasks
+found that they struggle with tasks that need an exact understanding of molecular strings, such as
+converting names to SMILES \cite{guo2023llmchem}. Fine-tuned LLMs can serve as property predictors
+in low-data settings \cite{jablonka2024leveraging}. A recent review covers both uses and the
+growing number of LLM agents in chemistry \cite{ramos2025review}.
+
+\paragraph{Agents with tools.}
+An LLM agent alternates between reasoning and calling external tools, and the tool results feed
+back into the next step \cite{yao2023react}. ChemCrow connected an LLM to a set of expert chemistry
+tools \cite{bran2024chemcrow}, and Coscientist planned and ran laboratory experiments with an LLM
+in control \cite{boiko2023coscientist}. In both systems the chemistry is done by the tools, and
+the LLM decides what to do next. El Agente applies the same pattern to computational chemistry: it
+plans and runs quantum-chemistry workflows, including xTB and DFT calculations, from requests in
+natural language \cite{zou2025elagente}. The agent in this thesis follows the same pattern
+(\cref{sec:agent}).
+
+\paragraph{LLMs as optimisers and mutation operators.}
+LLMs can also act inside an optimisation loop. In OPRO the LLM sees earlier solutions with their
+scores and proposes new ones \cite{yang2024opro}. Evolution through Large Models used an LLM as the
+mutation operator for computer programs \cite{lehman2022elm}, and language-model crossover used
+few-shot prompts to recombine parents \cite{meyerson2023lmx}. FunSearch paired an LLM with an
+automatic evaluator and found new mathematical constructions \cite{romeraparedes2024funsearch}.
+For molecules, MolLEO placed LLMs as mutation and crossover operators inside a graph-based genetic
+algorithm and reported faster progress than the baseline algorithm on several drug-design tasks,
+with molecules written as SMILES or SELFIES \cite{wang2024molleo}. Ojeda et al.\ evolved synthetic
+routes instead of molecules: LLM agents act as mutation operators, and deterministic chemistry
+tools carry out the routes, so the LLM cannot invent products \cite{ojeda2026harness}. This is the
+same division of work as in this thesis. The idea has also reached inorganic materials. MatLLMSearch
+used a pre-trained LLM inside an evolutionary loop to propose crystal structures
+\cite{gan2025matllmsearch}, and LLEMA combined LLM proposals with chemistry-based rules and a memory
+of past successes and failures for multi-objective materials discovery \cite{abhyankar2026llema}.
+
+\paragraph{Fine-tuning.}
+Logs of an optimisation loop can become training data. Low-rank adaptation (LoRA) fine-tunes a
+large model by training small added matrices \cite{hu2022lora}, and direct preference optimisation
+(DPO) trains a model to prefer one answer over another from pairs of examples
+\cite{rafailov2023dpo}. Both are possible next steps for this work (\cref{sec:future}).
+
+\section{Research gap}
+\label{sec:lit-gap}
+
+The work reviewed above leaves four gaps that this thesis addresses.
+\begin{enumerate}
+  \item LLM-guided evolution has been tested on drug-like molecules
+        \cite{wang2024molleo,ojeda2026harness} and on crystalline materials
+        \cite{gan2025matllmsearch,abhyankar2026llema}. We did not find a study that applies it to
+        GQDs, nanographenes or other PAHs, where validity depends on a global condition (a
+        Kekul\'e structure must exist).
+  \item We did not find a study in which the LLM edits a geometric representation, here a hexagon
+        grid, while code enforces the chemistry and explains every rejection.
+  \item The objective here is a quantum-chemical score for one device application, \ce{NO2}
+        sensing, and the screening method (xTB) is checked against DFT within the same work.
+  \item The comparison with random mutation uses the same xTB budget, the same validation and
+        selection, several seeds, and a complete log of every proposal.
+\end{enumerate}
+\authornote{A web search on 12 November 2026 found the studies cited in this section and no
+direct precedent for the four points above. Confirm this with a database search (Web of Science,
+Scopus, Google Scholar), and repeat it shortly before submission, because new work in this area
+appears every month.}

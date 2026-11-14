@@ -1,0 +1,137 @@
+% Chapter 1. Update the research questions or hypotheses only if the study design changes.
+\chapter{Introduction}
+\label{ch:intro}
+
+\section{Motivation}
+
+Nitrogen dioxide (\ce{NO2}) forms mainly in combustion, for example in vehicle engines and power
+plants. It irritates the airways, and long exposure is linked to respiratory disease. In 2021 the
+World Health Organization lowered its guideline for the annual mean concentration of \ce{NO2} to
+10~\(\mu\)g\,m\(^{-3}\) and added a 24-hour guideline of 25~\(\mu\)g\,m\(^{-3}\)
+\cite{who2021aqg}. Checking such low levels across a city needs many sensors, so the sensors must
+be cheap, small and able to work at room temperature with little power. A common design is the
+chemiresistor: a thin sensing layer whose electrical resistance changes when gas molecules adsorb
+on it.
+
+Graphene is an attractive sensing layer because every atom is on the surface. Schedin et
+al.\ showed that a graphene device can detect the adsorption of single \ce{NO2} molecules
+\cite{schedin2007detection}. \ce{NO2} takes electrons from graphene, which changes the number of
+charge carriers and therefore the resistance. Pristine graphene binds most gases weakly and has
+no band gap, so its response and its selectivity are limited \cite{leenaerts2008adsorption}.
+Changing the chemistry of the carbon layer, for example with dopants or defects, changes how
+strongly each gas binds \cite{zhang2009dopants,yuan2013graphene}.
+
+Graphene quantum dots (GQDs) are flakes of graphene a few nanometres across, with hydrogen atoms
+on the edge carbons. Their finite size opens a gap between the highest occupied and the lowest
+unoccupied molecular orbitals (HOMO and LUMO), and the size of this gap depends on the size,
+shape and edge type of the flake \cite{ponomarenko2008,bacon2014gqd}. Bottom-up organic synthesis
+can now make nanographenes with an exactly defined structure \cite{yan2010large,narita2015nanographene},
+so it makes sense to ask which exact structure is best for a given purpose. GQDs have already
+been used in \ce{NO2} sensors; for example, GQDs on \ce{SnO2} nanodomes gave a detection limit of
+1.1~ppb at room temperature \cite{lee2023gqdsno2}. What is missing is a systematic way to choose
+the GQD structure itself.
+
+\section{The design problem}
+
+The number of possible GQDs grows quickly with the number of fused hexagons. The dataset used
+in this work contains 91{,}174 distinct GQDs with 20 to 40 hexagons, and it is only a sample of
+what is possible at these sizes. A useful sensor material has to meet three requirements at once.
+It must respond to \ce{NO2}, which means that \ce{NO2} should take a noticeable amount of charge
+from it. It must recover, which means that \ce{NO2} must not bind so strongly that it stays on the
+surface. And it must be selective, which means that \ce{NO2} must bind more strongly than the other
+gases in air. These requirements pull in different directions: a GQD that gives electrons easily
+also tends to form a chemical bond with \ce{NO2}, and then the sensor does not reset.
+
+Each candidate has to be evaluated with quantum chemistry. In this work, one evaluation with the
+semiempirical method GFN2-xTB \cite{bannwarth2019gfn2} takes about a minute on a laptop, and a
+check with density functional theory (DFT) takes about an hour per GQD on a data-centre GPU. With
+this cost, exhaustive screening is out of reach, and the search method has to find good structures
+with a small number of evaluations. In molecular design this property is called sample efficiency
+\cite{gao2022pmo}.
+
+\section{Approach}
+
+Large language models (LLMs) can read and reason about chemistry, but they are poor at writing
+long molecular strings such as SMILES correctly \cite{guo2023llmchem}. Recent work has used LLMs as
+the mutation operator inside evolutionary algorithms, where the LLM proposes changes to good
+candidates and an objective function decides which changes survive
+\cite{lehman2022elm,romeraparedes2024funsearch,wang2024molleo}. Other work has given LLMs access
+to chemistry software as tools, so that the model plans while the tools compute
+\cite{yao2023react,bran2024chemcrow,boiko2023coscientist}.
+
+This thesis combines these ideas with a strict division of work: \emph{the LLM suggests, and code
+and quantum chemistry decide}. The LLM describes a GQD as a list of hexagon positions on a
+honeycomb grid instead of a SMILES string. Code turns this list into a molecule, checks it, and
+explains any problem in terms the LLM can act on. A score computed with GFN2-xTB measures how good
+the GQD is as an \ce{NO2} sensor, and an evolutionary loop asks the LLM to edit the best GQDs found
+so far. The same loop with random edits is the control. DFT calculations check where the
+xTB numbers can be trusted.
+
+The scope is limited to pure-carbon, closed-shell GQDs with 20 to 40 hexagons and no holes. All
+calculations describe a single gas molecule on a single GQD in the gas phase. Dopants, edge groups,
+fine-tuning of the LLM and dedicated generative models are left for future work
+(\cref{ch:conclusion}).
+
+\section{Research questions}
+\label{sec:rq}
+
+\begin{enumerate}[label=\textbf{RQ\arabic*.},leftmargin=*]
+  \item Can a general-purpose LLM design valid GQDs when it writes hexagon positions instead of
+        SMILES, and what prompt and feedback make it reliable?
+  \item Can a score computed with GFN2-xTB rank GQDs for \ce{NO2} sensing, and how well do its
+        numbers agree with DFT?
+  \item With the same number of xTB evaluations, does an LLM used as the mutation operator find
+        better \ce{NO2}-sensing GQDs than random mutation?
+  \item What do the best GQDs have in common?
+\end{enumerate}
+
+\section{Hypotheses}
+\label{sec:hypotheses}
+
+\begin{enumerate}[label=\textbf{H\arabic*.},leftmargin=*]
+  \item Most invalid LLM designs fail because they are open-shell, a global property that is hard
+        to see from coordinates. If the prompt states the closed-shell rule and the feedback lists
+        concrete edits that fix a rejected design, more than 90\% of requests will end in a valid
+        design within two retries. (Tested in experiment E1, \cref{sec:e1}.)
+  \item xTB will agree with DFT for physisorbed gases and will rank GQDs by charge transfer in
+        the same order as DFT, even where the absolute values differ. It will be less reliable for
+        chemisorbed \ce{NO2} and for \ce{O2}. Across a benchmark of GQDs, we expect a Spearman rank
+        correlation of at least 0.7 between the xTB and DFT values of the sensing descriptors.
+        (Experiments E2 to E4.)
+  \item The LLM sees the structures and scores of the best GQDs and the outcome of its earlier
+        edits, so its edits will be better than chance. Across repeated runs with the same xTB
+        budget, the LLM loop will reach a higher best score and a higher mean score of the
+        evaluated children than random mutation. (Experiment E5.)
+  \item A smaller HOMO-LUMO gap raises the charge given to \ce{NO2} but also the chance that
+        \ce{NO2} forms a covalent bond, which blocks recovery. The best sensors will therefore have
+        an intermediate gap and physisorb \ce{NO2}. (Experiments E2 and E5.)
+\end{enumerate}
+
+\section{Contributions}
+
+The work makes six contributions.
+\begin{enumerate}
+  \item A hexagon-grid representation of GQDs with exact conversion between hexagon lists and
+        molecules. The conversion checks the closed-shell condition directly and, for an
+        open-shell design, lists the hexagon edits that fix it. All 91{,}174 dataset structures
+        convert and convert back without error.
+  \item A machine-learned predictor of the GFN2-xTB gap (mean absolute error 0.023~eV on held-out
+        GQDs) with a calibrated uncertainty, used as a free pre-filter.
+  \item An \ce{NO2} sensing score from GFN2-xTB, calibrated on 50 GQDs and checked against DFT.
+  \item An evolutionary loop with an LLM or random mutation operator, code-based validation and
+        repair, a diversity rule, and a log of every proposal.
+  \item Controlled experiments: an ablation of prompt and feedback for LLM design, a comparison of
+        LLM and random mutation under the same xTB budget, and a GPU-accelerated DFT benchmark.
+  \item A log of edits and their measured effects, which is the starting point for fine-tuning a
+        smaller model.
+\end{enumerate}
+
+\section{Thesis outline}
+
+\Cref{ch:literature} reviews GQDs, gas sensing with graphene, the computational methods used here,
+and earlier work on molecular design with machine learning and LLMs. \Cref{ch:methods} describes
+the workflow and its algorithms in the order they were built. \Cref{ch:experiments} defines the
+experiments that test each hypothesis. \Cref{ch:results} reports the results, \cref{ch:discussion}
+discusses what they mean and where they are limited, and \cref{ch:conclusion} concludes and lists
+the next steps. The appendices give the LLM prompts, the logged fields and the commands needed to
+reproduce the work.

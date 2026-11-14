@@ -1,0 +1,179 @@
+% Chapter 6. Revisit each research question when its experiment finishes; keep the
+% limitations section honest and specific.
+\chapter{Discussion}
+\label{ch:discussion}
+
+\section{RQ1: can the LLM design valid GQDs in hexagon coordinates?}
+
+Yes, provided that the code explains its rejections in terms the LLM can act on. Writing hexagon
+positions removed the problems that make long SMILES strings hard to write: the LLM produced
+connected lists of roughly the requested size, and almost all of its valid designs were new. What
+it could not do was see whether a shape is closed-shell. This is a global property of the whole
+structure. A shape that looks reasonable can have one more atom on one sublattice than on the
+other, and nothing in a single coordinate pair reveals it. In the first run, 66 of 67 failed
+attempts were open-shell.
+
+The two aids address this in different ways. The rule in the prompt gives the LLM a way to avoid
+the problem, mainly by building point-symmetric shapes, and it raised the first-attempt pass rate.
+The fix edits turn the global condition into a short list of local actions, and they made retries
+succeed. Together they reached 99\%, which supports H1. The price is less variety, because the
+rule pushes the LLM toward a few safe symmetric shapes. For the agent, which rejects repeats, this
+price is acceptable, and the evolutionary loop gets its variety from the parents it edits.
+
+The loop showed that validity is not settled by the representation alone. When the LLM edited
+existing GQDs rather than designing new ones, other errors appeared: adding a hexagon that was
+already present, removing one that was not, proposing a duplicate, or using more edits than
+allowed. The repair step in version 2 recovered many of these children. The general lesson is to
+divide the work by what each side can check. The LLM works in a representation where a small
+change to the shape is a small change to the text, and the code handles global constraints and
+returns actionable feedback.
+
+\section{RQ2: can xTB rank GQDs for \NOtwo{} sensing?}
+
+The small-model check (E3) answers part of this question. For physisorption, which is the regime
+of every top candidate, xTB adsorption energies are close to DFT. For chemisorption, xTB is
+qualitatively right but overbinds by 0.1 to 0.55~eV, and the reversibility window of the score was
+placed with this error in mind. For \ce{O2}, xTB is wrong: it binds a molecule that DFT does not
+bind at all. The charge transferred to physisorbed \ce{NO2} is too large in xTB, but it follows the
+HOMO energy of the GQD (\(r = 0.88\)), which is the right physical trend.
+
+The results of the loop sharpened this question. For all 40 best GQDs, the reversibility and
+selectivity factors equal 1, so the score of the best candidates is the xTB charge alone
+(\cref{sec:res-best}). The ranking at the top therefore depended on the one quantity that xTB was
+suspected to overestimate.
+
+The GPU benchmark (E4) answers the question, and the answer is split. xTB ranks GQDs well by how
+strongly they bind \ce{NO2}, \ce{H2O} and \ce{NH3} (\(\rho = 0.74\) to 0.95) and by their
+selectivity margin (\(\rho = 0.86\)), so for binding and selectivity H2 is supported. It does not
+rank them by charge transfer (\(\rho = -0.11\)), because in DFT physisorbed \ce{NO2} takes almost
+no charge at all (0.01~\(e\) against 0.23~\(e\) in xTB). H2 is therefore contradicted for the
+response, and with it for the score (\(\rho = -0.16\)). By the rule fixed in advance, the score has
+to change. Two further corrections follow from DFT: water, not CO, is the most dangerous
+competing gas, and \ce{O2} does not bind, so the air-stability concern raised by the xTB \ce{O2}
+energies disappears at this level of theory.
+
+The consequences for the earlier results are direct. The best GQDs of both the calibration and
+the evolutionary loops were selected for a large xTB charge on physisorbed \ce{NO2}, and in DFT
+this charge is close to zero. They remain GQDs that bind \ce{NO2} selectively and reversibly, but
+they are not shown to give a large electronic response. What the loops optimised was, in effect,
+an xTB artefact that follows the HOMO energy. The comparison of the mutators (RQ3) is not affected
+as a test of search methods, because both mutators optimised the same objective, but its winners
+are not validated sensor candidates.
+
+The broken-symmetry check adds a second problem for the same GQDs (\cref{tab:e4-bs}). The GQDs
+with the smallest xTB gaps, which include the best GQDs of both pilot runs, have strong open-shell
+character in DFT (\(\langle S^2\rangle \approx 1.5\) to 1.7 and a lowering of up to 0.82~eV), even
+though each has a Kekul\'e structure. The closed-shell rule of the pipeline is a test of the
+graph, and it does not exclude this. Both the closed-shell xTB scores and the RKS-referenced DFT
+energies of these GQDs therefore rest on a reference state that is not the lowest one, and the
+strong DFT binding of \ce{NO2} on them is mostly an artefact of that reference. The charge result
+does not depend on this, since the nearly closed-shell \code{gqd\_88143} also shows no charge on
+\ce{NO2}. The check covers four GQDs with one functional at xTB geometries, so it shows that the
+problem exists but not where the gap limit lies. How to treat open-shell character is open
+(\code{RESEARCH\_OPTIONS.md}, D22).
+
+Three ways to repair the score are open (\code{RESEARCH\_OPTIONS.md}, D7). The response could be
+taken from DFT for the final candidates only, which is accurate but too slow for the loop. It could
+be replaced by an orbital descriptor, such as the alignment of the GQD's HOMO with the singly
+occupied orbital of \ce{NO2}, which can be computed cheaply and has a clear physical meaning. Or the
+target could move to the regime that DFT favours: a weak, reversible covalent bond to \ce{NO2}
+(about \(-0.3\) to \(-0.6\)~eV), which in DFT still moves about 0.2~\(e\). The two benchmark GQDs
+that keep a non-zero DFT score are of this kind. Separately, the sensor model proposed in
+\cref{sec:future} would help with all three, because a real chemiresistor responds to the change
+in carrier density of the film, and that depends on more than the net charge on one molecule.
+
+\section{RQ3: does the LLM find better GQDs than random mutation?}
+
+The answer depends on what is measured. With three runs per mutator, the LLM's children scored
+higher on average in every pair of runs (0.186 against 0.163 over all runs) and chemisorbed
+\ce{NO2} less often, so its edits are better than random ones on average. But the best GQD came
+from random mutation in two of the three pairs, and the mean best score was 0.351 for random
+mutation against 0.344 for the LLM. For the goal of the search, which is the best GQD found within
+the budget, the LLM gave no advantage. H3 is supported for the mean score and not supported for the
+best score. The pilot, in which the LLM found the best GQD, was within this run-to-run variation.
+Several reasons can explain this outcome.
+
+First, the headroom is small. The best starting GQD scored 0.322 and the best GQD found so far
+scores 0.356, a gain of about 10\%. Gains of a few hundredths are close to the noise of the score,
+which comes from xTB itself and from probing only two adsorption sites. Second, the score
+saturates. Once a GQD physisorbs \ce{NO2} with a good margin over CO, the score equals the charge
+transfer, and the remaining differences are small changes in a single number. Third, random edits
+with automatic repair are a strong local search on this problem. Most single-hexagon edits produce
+a valid, similar GQD, and the population keeps the good ones. The MolLEO study reports a similar
+observation for drug-like molecules: in some settings the default graph-based mutation performed
+about as well as LLM mutation while using fewer LLM queries \cite{wang2024molleo}.
+\authornote{Check this statement against the MolLEO paper before submission.} Fourth, the LLM was asked to make
+mostly refinements of the best parents, which favours exploitation over exploration. Careful
+refinements raise the average, while the best GQD of a run is an outlier, and the wider variety of
+random edits produces more outliers. The pilot also showed that the LLM's multi-edit proposals fail
+more often than single edits.
+
+The LLM run has value beyond the best score. Every LLM edit comes with a stated reason, which makes
+its choices auditable, and the logged reasons and outcomes are the material for fine-tuning a model
+that may propose better edits than either mutator. Three runs per mutator are few, so these conclusions should be
+checked with more runs. \pending{Comparison with the baseline without evolution (E6).}
+
+\section{RQ4: what do the best GQDs have in common?}
+
+The calibration (E2) showed the trade-off of H4: a smaller gap raises the charge given to \ce{NO2},
+but most small-gap GQDs chemisorb it and lose the ability to recover. The best calibration GQDs
+balanced the two at gaps of 0.49 to 0.67~eV. Both loops then found GQDs with smaller gaps, 0.26 to
+0.43~eV for the ten best, that still physisorb \ce{NO2} at both probed sites, and these scored
+higher. All of the best GQDs have 29 to 40 hexagons, bind \ce{NO2} at about \(-0.43\) to
+\(-0.52\)~eV and prefer it over the strongest competing gas by at least 0.16~eV. These results support H4 at the xTB level.
+
+DFT changes this picture (E4). The first half of the trade-off, a larger response at a smaller gap,
+rests on the physisorbed xTB charge, which DFT does not reproduce. In DFT, the response survives
+only where \ce{NO2} forms a bond, and the two benchmark GQDs with a non-zero DFT score form a weak
+one (\(-0.31\) and \(-0.41\)~eV). The design target that DFT suggests is therefore a weak,
+reversible bond to \ce{NO2} rather than physisorption, so H4 is not supported at the DFT level.
+
+Two further cautions apply. Chemisorption depends on the local site, and only two sites were
+probed, so a GQD that physisorbs \ce{NO2} at its centre and its most exposed edge may still
+chemisorb it elsewhere. Small-gap GQDs are generally more reactive, but in DFT \ce{O2} did not bind
+eleven of the twelve benchmark GQDs, including both pilot bests, so air stability is not a concern
+at this level of theory.
+
+\section{Limitations}
+\label{sec:limitations}
+
+\paragraph{Model of the sensor.} Every calculation describes one gas molecule on one isolated GQD
+in the gas phase at 0~K. The model leaves out the substrate, the electrical contacts, the
+coverage of gas molecules, humidity, temperature and the arrangement of GQDs in a real film. The
+response is represented by the charge moved to \ce{NO2}, which is a proxy for the change in
+conductance and not a prediction of it. Recovery is estimated from the adsorption energy alone.
+
+\paragraph{Sites and configurations.} Only two adsorption sites are probed, and each interfering
+gas is tried in one orientation. Optimisations start from one height and can end in a local
+minimum. For final candidates, all symmetry-distinct sites should be checked.
+
+\paragraph{Level of theory.} The score is computed with xTB, whose weaknesses for charge transfer
+and \ce{O2} are documented above. The DFT checks are single points at xTB geometries with a small
+basis set and no counterpoise correction, and atomic charges depend on the partitioning scheme.
+
+\paragraph{Chemical space.} Only pure-carbon, closed-shell GQDs with 20 to 40 hexagons and no holes
+are considered, and shapes whose SMILES RDKit cannot re-read are excluded. ``New'' means absent from
+our dataset of 91{,}174 structures, not absent from the literature.
+
+\paragraph{The LLM.} The LLM is a commercial model accessed through an API. Its replies cannot be
+seeded, and the model behind a deployment may change over time. The logged prompts and replies make
+every run auditable, but an LLM run cannot be repeated exactly. LLM calls are not counted in the xTB
+budget, and their cost and time were not measured.
+
+\paragraph{Statistics and design choices.} Three runs per mutator give limited statistical power
+(\cref{sec:e5}), and children within a run are not independent. Several settings of the loop, such
+as the gap window, the family cap, the amount of history shown to the LLM and the strategy hint in
+the prompt, were chosen once and not tuned for either mutator. A different choice could favour one
+of them.
+
+\paragraph{Predictor.} The gap predictor is trained on the dataset distribution and is used only as
+a filter. Its window can remove good children, as the pilot's 0.30~eV floor did.
+
+\section{Practical cost}
+
+One full xTB evaluation takes about a minute on the laptop, and inside the loop ten children are
+scored in about 3 to 6 minutes, so a ten-generation run takes about an hour. A run used 27 to 34
+LLM calls. The DFT benchmark of 12 GQDs needs 162 single points, about 12 hours on one A100, or
+roughly one hour per GQD with all gases. The work was split by hardware: the xTB loop ran on the
+laptop CPU, which was six times faster for xTB than the shared server CPU, and DFT ran on the
+server GPU. This split kept each kind of calculation on the hardware that suits it.

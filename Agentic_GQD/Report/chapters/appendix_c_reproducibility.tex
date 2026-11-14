@@ -1,0 +1,42 @@
+% Appendix C. Add the command for every new experiment.
+\chapter{Reproducing the results}
+\label{app:reproduce}
+
+All code is in the \code{Agentic\_GQD} folder of the project repository, one folder per stage, each
+with a README. Commands are run from \code{Agentic\_GQD} with the project's Python environment
+(\code{.venv}). The LLM steps need Azure OpenAI settings in \code{studio/.env}, which are not part of
+the repository. xTB runs use the conda-forge build of xTB 6.7.1; the path can be set with the
+\code{XTB\_BIN} environment variable.
+
+\begin{table}[ht]
+  \centering
+  \caption{Commands for each stage.}
+  \label{tab:commands}
+  \small
+  \begin{tabularx}{\textwidth}{@{}lL@{}}
+    \toprule
+    Stage & Command and notes \\
+    \midrule
+    1  & \code{.venv/bin/python Stage1/build\_hex\_dataset.py} (about 3 minutes) \\
+    2  & \code{.venv/bin/python Stage2/build\_features.py}, then
+         \code{.venv/bin/python Stage2/train.py --trials 100 --folds 5 --gnn-epochs 300}
+         (about 80 minutes on the laptop CPU) \\
+    2d & \code{.venv/bin/python Stage2d/llm\_hexagon\_test.py --n 80 --retries 2}
+         (about 550 LLM calls, about 10 minutes) \\
+    3a & \code{.venv/bin/python Stage3a/calibrate.py --n 50}, then
+         \code{.venv/bin/python Stage3a/analyze.py}; small-model DFT with
+         \code{Stage3a/dft\_check.py} and \code{Stage3a/xtb\_vs\_dft.py} \\
+    3, 4 & \code{.venv/bin/python Stage3/evolve.py --run llm\_v2\_s1 --mutator llm --seed 1
+         --generations 10 --children 10 --parallel 5} (and \code{--mutator random}; seeds 1 to 3);
+         then \code{.venv/bin/python Stage3/compare.py <runs> --name v2} \\
+    DFT & \code{Stage3a/make\_geometries.py} writes the geometries; on the GPU server,
+         \code{CUDA\_VISIBLE\_DEVICES=0 python Stage3a/dft\_gpu.py Stage3a/data/dft\_benchmark};
+         environments from \code{server/setup\_envs.sh} \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+A run of \code{evolve.py} that stops can be restarted with the same \code{--run} name, and it
+continues after the last finished generation. \code{dft\_gpu.py} keeps every finished calculation
+in \code{dft\_results.jsonl} and also resumes where it stopped; \code{--summary-only} writes the
+comparison tables from the finished calculations.

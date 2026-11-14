@@ -1,0 +1,164 @@
+% Chapter 4. Add a section for every new experiment and keep the status column of
+% tab:experiments current (done / running / planned).
+\chapter{Experimental design}
+\label{ch:experiments}
+
+This chapter defines the experiments that answer the research questions of \cref{sec:rq} and test
+the hypotheses of \cref{sec:hypotheses}. \Cref{tab:experiments} gives an overview, and the
+sections below give the design of each experiment: what is varied, what is held fixed, and what
+is measured.
+
+\begin{table}[ht]
+  \centering
+  \caption{Experiments, the questions they address and their status at the time of writing.}
+  \label{tab:experiments}
+  \small
+  \begin{tabularx}{\textwidth}{@{}lLlll@{}}
+    \toprule
+    & Experiment & RQ & Hypothesis & Status \\
+    \midrule
+    E1 & LLM designs GQDs as hexagon lists: prompt \(\times\) feedback ablation & RQ1 & H1 & done \\
+    E2 & Calibration of the sensing score on 50 dataset GQDs & RQ2, RQ4 & H2, H4 & done \\
+    E3 & xTB against DFT on two small models (tetracene, coronene) & RQ2 & H2 & done \\
+    E4 & xTB against DFT on 12 GQDs (GPU benchmark) & RQ2 & H2 & done \\
+    E5a & Pilot: LLM against random mutation, one run each & RQ3, RQ4 & H3, H4 & done \\
+    E5b & Main comparison: three runs per mutator, loop version 2 & RQ3, RQ4 & H3, H4 & done \\
+    E6 & Baseline: random GQDs without evolution, same xTB budget & RQ3 & H3 & planned \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+% ==========================================================================================
+\section{E1: LLM design with hexagon coordinates}
+\label{sec:e1}
+
+\paragraph{Question.} How often does the LLM produce a valid GQD when it writes hexagon positions,
+and how much do the closed-shell rule in the prompt and the fix edits in the feedback help?
+
+\paragraph{Requests.} Each request asks for one GQD with a target size drawn at random between 20
+and 40 hexagons and one of eight shape descriptions: roughly round, elongated (a ribbon about three
+hexagons wide), triangular, rectangular, irregular, mostly armchair edges, mostly zigzag edges, or
+L-shaped. The same 80 requests (fixed random seed) are used in every condition. The requests go to
+the same LLM deployment, tool and validation code as the agent. When a design fails, the rejection
+message is returned and the LLM may retry up to two times.
+
+\paragraph{Conditions.} A \(2 \times 2\) design varies the prompt and the feedback:
+\begin{itemize}
+  \item prompt: \emph{basic} (coordinates, neighbour rule and size only) or \emph{rule} (basic
+        plus the closed-shell rule and the point-symmetry tip of \cref{sec:rule-prompt});
+  \item feedback: \emph{plain} (``no Kekul\'e form'') or \emph{fixes} (the imbalance and the fix
+        edits of \cref{alg:fixes}).
+\end{itemize}
+An earlier run of 50 requests with the basic prompt and plain feedback was used to find the main
+cause of failure before the ablation was designed.
+
+\paragraph{Measures.} Share of requests valid at the first attempt and after retries, mean number
+of attempts, failed attempts by reason, number of distinct valid designs and the most repeated
+design, novelty against the 91{,}174-structure dataset, share of point-symmetric designs, mean
+deviation from the requested size, predicted gap range, and the number of designs with holes.
+
+% ==========================================================================================
+\section{E2: calibration of the sensing score}
+\label{sec:e2}
+
+\paragraph{Question.} How do the \ce{NO2} descriptors and the score vary across GQDs, and which
+GQDs score best?
+
+\paragraph{Sample.} Fifty GQDs were drawn from the 14{,}674 xTB-labelled structures, five from
+each 0.2~eV bin of the dataset gap between 0 and 2.03~eV (random seed 0). They have 20 to 37
+hexagons.
+
+\paragraph{Procedure.} Each GQD was evaluated with all five gases (\cref{alg:evaluate}). As a
+check of the geometry step, the gap of each optimised GQD was compared with the gap stored in the
+dataset.
+
+\paragraph{Measures.} Adsorption energy, charge transfer and chemisorption of \ce{NO2}; adsorption
+energies of the interfering gases; selectivity margin; score; and their dependence on the gap. A
+small classification study tested whether simple structural features predict chemisorption (area
+under the ROC curve).
+
+% ==========================================================================================
+\section{E3: xTB against DFT on small models}
+\label{sec:e3}
+
+\paragraph{Question.} Where do GFN2-xTB adsorption energies and charges agree with DFT?
+
+\paragraph{Systems.} Tetracene, on which xTB chemisorbs \ce{NO2}, and coronene, on which xTB
+physisorbs it. These two cover both binding regimes and are small enough for DFT on the laptop.
+
+\paragraph{Procedure.} The xTB-optimised complexes of all gases at both sites were recomputed with
+DFT (\cref{sec:dft-methods}) at the same geometries.
+
+\paragraph{Measures.} Adsorption energy and charge on the gas for every complex, from xTB and from
+DFT.
+
+% ==========================================================================================
+\section{E4: xTB against DFT on twelve GQDs}
+\label{sec:e4}
+
+\paragraph{Question.} Does xTB rank full-size GQDs in the same order as DFT for the quantities
+that enter the score, and do the best GQDs bind \ce{O2} in DFT?
+
+\paragraph{Sample.} Ten calibration GQDs spread over the range of scores, and the best GQD of each
+pilot run (\code{llm\_s0\_g10c004} and \code{random\_s0\_g02c004}).
+
+\paragraph{Procedure.} 162 DFT single points on one A100 GPU, in three phases
+(\cref{sec:dft-methods}).
+
+\paragraph{Measures.} For each complex, the xTB and DFT adsorption energy and charge. For each GQD,
+the descriptors and score from both methods. The main outcome is Spearman's rank correlation
+\(\rho\) \cite{spearman1904} between xTB and DFT for \(E_{\ce{NO2}}\), \(q_{\ce{NO2}}\) and the
+score. We fixed the decision rule before seeing the results:
+\begin{itemize}
+  \item \(\rho \geq 0.7\): xTB ranking is accepted, and the loop results stand as they are;
+  \item \(0.4 \leq \rho < 0.7\): xTB is used for screening, and the top GQDs are re-ranked with
+        DFT;
+  \item \(\rho < 0.4\): the score must change, for example to a response term based on the HOMO
+        energy or a correction learned from DFT.
+\end{itemize}
+The \ce{O2} adsorption energies give a first check of air stability.
+
+% ==========================================================================================
+\section{E5: LLM against random mutation}
+\label{sec:e5}
+
+\paragraph{Question.} With the same number of xTB evaluations, does the LLM mutator find better
+GQDs than the random mutator?
+
+\paragraph{Fixed across runs.} The starting pool (the 50 calibration GQDs; best score 0.322), the
+validation and repair, the gap pre-filter, the number of generations (10) and of xTB-scored
+children per generation (up to 10), the selection rule, and the final check. The xTB budget is
+therefore at most 100 evaluations per run for both mutators.
+
+\paragraph{Varied.} The mutator, and the random seed. In the pilot (E5a) each mutator ran once
+with seed 0 and the first version of the loop. In the main comparison (E5b) each mutator runs three
+times with seeds 1, 2 and 3 and version 2 of the loop (\cref{tab:loop-versions}). The seed fixes
+all random choices of the loop. It does not fix the LLM, whose replies vary from call to call; for
+the LLM runs the seed fixes only the loop around it.
+
+\paragraph{Measures.} For each run: the number of proposals; the share that were valid; the share
+that became valid only after repair by code; the number scored by xTB; the share of scored children
+that beat their parent; the share that chemisorbed \ce{NO2}; the mean score of the scored children;
+the best score; and the number of children above the best starting score. The curve of the best
+score against the number of xTB evaluations shows sample efficiency. The number of LLM calls is
+reported separately, because LLM calls are not part of the xTB budget.
+
+\paragraph{Statistics.} For each mutator we report the mean and standard deviation over runs of
+the best score and of the mean score. As a rough guide, a one-sided Mann-Whitney U test
+\cite{mannwhitney1947} compares the scores of all scored children of the two mutators; children of
+the same run are not independent, so this test overstates the evidence. With three runs per
+mutator, a rank test on the per-run best scores cannot give a one-sided \(p\)-value below 0.05
+(there are only 20 ways to split six runs into two groups of three). We therefore judge the main
+comparison by the size of the differences and by whether they hold in every pair of runs, and not
+by a significance threshold alone.
+
+% ==========================================================================================
+\section{E6: baseline without evolution (planned)}
+\label{sec:e6}
+
+The original plan compares three methods with the same xTB budget: random generation of new GQDs
+without any evolution, evolution with random edits, and evolution with LLM edits. E5 covers the
+last two. E6 will generate GQDs with the same random growth procedure that produced the dataset,
+apply the same validation and pre-filter, and score about 100 of them with xTB. It shows how much
+the evolutionary loop itself adds, independent of the mutator.
+\pending{Run E6 after E5b finishes.}

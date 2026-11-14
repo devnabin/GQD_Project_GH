@@ -1,0 +1,21 @@
+{
+  "run": "llm_v2_s3",
+  "mutator": "llm",
+  "children": 10,
+  "population": 8,
+  "family_cap": 3,
+  "history": 1,
+  "seed": 3,
+  "gap_window": [
+    0.2,
+    1.6
+  ],
+  "goal": "maximise the NO2 sensing score (charge to NO2 x reversibility x selectivity vs CO)",
+  "system_prompt": "You improve graphene quantum dots (GQDs) for an NO2 gas sensor. A GQD is a set of fused hexagons on a honeycomb grid, written as [q, r] positions. Hexagon rules: each hexagon is [q, r] in axial coordinates; the six neighbours of [q, r] are [q+1, r], [q-1, r], [q, r+1], [q, r-1], [q+1, r-1], [q-1, r+1]. All hexagons must form one connected piece, with no duplicates, 20-40 hexagons. The GQD must be closed-shell: its carbon atoms form two alternating sets (sublattices) that must be equal in number. Triangular shapes, L-shaped corners and long zigzag edges usually break this and are rejected as open-shell. A reliable way to stay closed-shell is a point-symmetric shape: pick a centre and, for every [q, r] in the list, also include [a-q, b-r] (for example with a = b = 0, [2, -1] needs [-2, 1]). If a requested shape cannot be closed-shell, build the closest closed-shell variant. If a design is rejected, the message explains why and lists edits that fix it. How a GQD is scored (xTB calculations; higher is better): sensing score = charge moved to NO2 (e) x reversibility x selectivity. Reversibility is 1 if NO2 binds no more strongly than -0.6 eV (so it can leave again) and falls to 0 at -1.0 eV (NO2 forms a chemical bond and stays). Selectivity is 1 if NO2 binds at least 0.1 eV more strongly than CO, the strongest competing gas. NO2 is tested above two hexagons of each GQD: the most central one and the most exposed edge one. You make children by editing a parent: ADD [q, r] puts a new hexagon next to the shape, REMOVE [q, r] takes one away (the rest must stay connected). Each child is 1-3 edits on one parent. A child must be a new structure (not made before in this run and not in our 91k-structure dataset), closed-shell, 20-40 hexagons, without holes. If a child is open-shell, code first tries to repair it by adding or removing one hexagon (shown in the results as 'code added ...'). If a child is still rejected, any fix edits in the message apply to the child, so append one to that child's edits. Study how the high-scoring GQDs differ from the low-scoring ones, then propose edits you expect to raise the score: mostly refinements of the best parents, plus a few bolder changes.",
+  "loop_analytes": [
+    "NO2",
+    "CO"
+  ],
+  "llm_model": "gpt-5.4",
+  "llm_model_note": "added on 2026-11-12 after the run, from AZURE_OPENAI_MODEL in studio/.env"
+}

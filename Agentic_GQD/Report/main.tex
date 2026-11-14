@@ -1,0 +1,162 @@
+% Created date: 2026-11-12 (America/Chicago)
+% Thesis draft for the Agentic_GQD project.
+% Build:  cd Report && latexmk -pdf main.tex     (or upload the Report/ folder to Overleaf)
+% Keep it current: the "Thesis report" rule in ../AGENTS.MD says which chapter to update
+% after each new experiment, result or change of method. Placeholders use \pending{...}.
+\documentclass[12pt,letterpaper,oneside]{report}
+
+% ------------------------------------------------------------------ packages
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage[margin=1in]{geometry}
+\usepackage{setspace}
+\onehalfspacing
+\usepackage{microtype}
+\usepackage{amsmath,amssymb}
+\usepackage[version=4]{mhchem}
+\usepackage{graphicx}
+\graphicspath{{figures/}}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{array}
+\usepackage{multirow}
+\usepackage[table]{xcolor}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,shapes.geometric,fit,calc,backgrounds}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage[section]{placeins}  % keep figures and tables inside their own section
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{enumitem}
+\usepackage{listings}
+\usepackage[numbers,sort&compress]{natbib}
+\usepackage[hidelinks]{hyperref}
+\usepackage[capitalise,nameinlink]{cleveref}
+
+\captionsetup{font=small,labelfont=bf}
+\setlist{itemsep=2pt,topsep=4pt}
+\lstset{basicstyle=\ttfamily\footnotesize,breaklines=true,columns=fullflexible,
+        keepspaces=true,frame=single,framesep=6pt,xleftmargin=6pt,xrightmargin=6pt,
+        literate={é}{{\'e}}1}
+\crefname{algorithm}{Algorithm}{Algorithms}
+\newcolumntype{L}{>{\raggedright\arraybackslash}X}
+
+% ------------------------------------------------------------------ project macros
+% A result that is not available yet. Search for \pending to find every open item.
+\newcommand{\pending}[1]{\textcolor{orange!70!black}{\textbf{[Pending:} #1\textbf{]}}}
+% A note to the author (remove before submission).
+\newcommand{\authornote}[1]{\textcolor{blue!60!black}{[Note: #1]}}
+\newcommand{\NOtwo}{\texorpdfstring{\ce{NO2}}{NO2}}
+\newcommand{\Eads}{E_{\mathrm{ads}}}
+\newcommand{\code}[1]{\texttt{#1}}
+
+% ------------------------------------------------------------------ title data
+\newcommand{\thesistitle}{LLM-Guided Design of Graphene Quantum Dots for \ce{NO2} Gas Sensing}
+\newcommand{\thesissubtitle}{An agentic workflow on a hexagon grid with xTB scoring and DFT checks}
+\newcommand{\thesisauthor}{Nabin Bhandari}
+\newcommand{\thesisdegree}{[Degree, e.g. Master of Science in \dots]}
+\newcommand{\thesisdepartment}{[Department]}
+\newcommand{\thesisuniversity}{[University]}
+\newcommand{\thesisadvisor}{[Advisor name]}
+\newcommand{\thesisdate}{[Month Year]}
+
+\hypersetup{pdftitle={LLM-Guided Design of Graphene Quantum Dots for NO2 Gas Sensing},
+            pdfauthor={Nabin Bhandari}}
+
+\begin{document}
+
+% ------------------------------------------------------------------ title page
+\begin{titlepage}
+  \centering
+  \vspace*{1.5cm}
+  {\LARGE\bfseries \thesistitle\par}
+  \vspace{0.6cm}
+  {\large \thesissubtitle\par}
+  \vspace{2cm}
+  {\large \thesisauthor\par}
+  \vspace{2cm}
+  A thesis submitted in partial fulfilment of the requirements for the degree of\par
+  \vspace{0.3cm}
+  {\large \thesisdegree\par}
+  \vspace{1.2cm}
+  \thesisdepartment\par
+  \thesisuniversity\par
+  \vspace{1.2cm}
+  Advisor: \thesisadvisor\par
+  \vfill
+  {\large \thesisdate\par}
+  \vspace{0.5cm}
+  {\small\color{gray} Working draft compiled on \today}
+\end{titlepage}
+
+\pagenumbering{roman}
+
+% ------------------------------------------------------------------ abstract
+\chapter*{Abstract}
+\addcontentsline{toc}{chapter}{Abstract}
+\input{chapters/00_abstract}
+
+% ------------------------------------------------------------------ front matter
+\chapter*{Acknowledgements}
+\addcontentsline{toc}{chapter}{Acknowledgements}
+\authornote{To be written by the author.}
+
+\chapter*{Statement on the use of AI tools}
+\addcontentsline{toc}{chapter}{Statement on the use of AI tools}
+\authornote{Check your university's policy and complete this statement. Two kinds of use should be
+declared separately: (1) the large language model that is part of the method studied in this
+thesis (GPT-5.4 through Azure OpenAI, \cref{sec:agent,sec:loop}), and (2) any AI assistance used
+to write code or text for the thesis itself.}
+
+\tableofcontents
+\listoffigures
+\listoftables
+
+\chapter*{Abbreviations}
+\addcontentsline{toc}{chapter}{Abbreviations}
+\begin{tabularx}{\textwidth}{@{}lL@{}}
+  DFT & density functional theory \\
+  GFN2-xTB & geometry, frequency and noncovalent interactions extended tight-binding method, version 2 \\
+  GNN & graph neural network \\
+  GPU & graphics processing unit \\
+  GQD & graphene quantum dot \\
+  HOMO, LUMO & highest occupied and lowest unoccupied molecular orbital \\
+  LLM & large language model \\
+  MAE & mean absolute error \\
+  PAH & polycyclic aromatic hydrocarbon \\
+  RKS, UKS & restricted and unrestricted Kohn-Sham DFT \\
+  SA score & synthetic accessibility score \\
+  SCF & self-consistent field \\
+  SMILES & simplified molecular-input line-entry system \\
+  SELFIES & self-referencing embedded strings \\
+\end{tabularx}
+
+\cleardoublepage
+\pagenumbering{arabic}
+
+% ------------------------------------------------------------------ chapters
+\input{chapters/01_introduction}
+\input{chapters/02_literature_review}
+\input{chapters/03_methods}
+\input{chapters/04_experimental_design}
+\input{chapters/05_results}
+\input{chapters/06_discussion}
+\input{chapters/07_conclusion}
+
+% ------------------------------------------------------------------ appendices
+\appendix
+\crefalias{chapter}{appendix}
+\input{chapters/appendix_a_prompts}
+\input{chapters/appendix_b_logging}
+\input{chapters/appendix_c_reproducibility}
+
+% ------------------------------------------------------------------ references
+\cleardoublepage
+\phantomsection
+\addcontentsline{toc}{chapter}{References}
+\bibliographystyle{unsrtnat}
+\bibliography{references}
+
+\end{document}

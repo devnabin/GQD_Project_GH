@@ -1,0 +1,314 @@
+{
+ "n_hex": 35,
+ "n_atoms": 160,
+ "gqd_gap_eV": 0.364737054432,
+ "gqd_max_out_of_plane_A": 3.9070298250282103,
+ "analytes": "NO2,H2O,NH3,CO,O2",
+ "site_cells": {
+  "centre": [
+   -5,
+   5
+  ],
+  "edge": [
+   0,
+   0
+  ]
+ },
+ "gqd_converged": true,
+ "all_converged": true,
+ "E_NO2_eV": -0.4902523153763241,
+ "q_NO2_e": -0.33133263999999996,
+ "site_NO2": "centre/NO2_O",
+ "dmin_NO2_A": 2.236842582714423,
+ "gap_NO2_complex_eV": 0.311558121088,
+ "E_H2O_eV": -0.1944356661663562,
+ "q_H2O_e": 8.935000000004356e-05,
+ "site_H2O": "centre/H2O",
+ "dmin_H2O_A": 2.3303329739722995,
+ "E_NH3_eV": -0.23711648831418586,
+ "q_NH3_e": 0.007371090000000052,
+ "site_NH3": "centre/NH3",
+ "dmin_NH3_A": 2.3165991950268934,
+ "E_CO_eV": -0.23796845150286572,
+ "q_CO_e": -0.06523058000000001,
+ "site_CO": "centre/CO",
+ "dmin_CO_A": 2.5731405017875493,
+ "E_O2_eV": -2.754331744491452,
+ "q_O2_e": -0.41764342,
+ "site_O2": "edge/O2",
+ "dmin_O2_A": 1.433702785708822,
+ "strongest_interferent": "CO",
+ "interferents_checked": "H2O,NH3,CO",
+ "selectivity_margin_eV": 0.25228386387345836,
+ "humidity_margin_eV": 0.29581664920996786,
+ "NO2_chemisorbed": false,
+ "recovery_time_s": 0.0001935725204128561,
+ "charge_to_NO2_e": 0.33133263999999996,
+ "reversibility": 1.0,
+ "selectivity": 1.0,
+ "sensing_score": 0.33133263999999996,
+ "details": [
+  {
+   "analyte": "NO2",
+   "orientation": "NO2",
+   "site": "centre",
+   "E_ads_eV": -0.4563675503783884,
+   "q_gas_e": -0.3032573,
+   "gap_complex_eV": 0.265132452038,
+   "d_min_A": 2.415315377289085,
+   "converged": true
+  },
+  {
+   "analyte": "NO2",
+   "orientation": "NO2",
+   "site": "edge",
+   "E_ads_eV": -0.34924530345477933,
+   "q_gas_e": -0.23096718,
+   "gap_complex_eV": 0.276190159584,
+   "d_min_A": 2.7151006737034264,
+   "converged": true
+  },
+  {
+   "analyte": "NO2",
+   "orientation": "NO2_O",
+   "site": "centre",
+   "E_ads_eV": -0.4902523153763241,
+   "q_gas_e": -0.33133263999999996,
+   "gap_complex_eV": 0.311558121088,
+   "d_min_A": 2.236842582714423,
+   "converged": true
+  },
+  {
+   "analyte": "NO2",
+   "orientation": "NO2_O",
+   "site": "edge",
+   "E_ads_eV": -0.34760914730520653,
+   "q_gas_e": -0.25550365999999997,
+   "gap_complex_eV": 0.279809582148,
+   "d_min_A": 2.7926475573902136,
+   "converged": true
+  },
+  {
+   "analyte": "H2O",
+   "orientation": "H2O",
+   "site": "centre",
+   "E_ads_eV": -0.1944356661663562,
+   "q_gas_e": 8.935000000004356e-05,
+   "gap_complex_eV": 0.365991398927,
+   "d_min_A": 2.3303329739722995,
+   "converged": true
+  },
+  {
+   "analyte": "H2O",
+   "orientation": "H2O",
+   "site": "edge",
+   "E_ads_eV": -0.11718703886552362,
+   "q_gas_e": -0.006431940000000025,
+   "gap_complex_eV": 0.364078644746,
+   "d_min_A": 2.7080996421867742,
+   "converged": true
+  },
+  {
+   "analyte": "NH3",
+   "orientation": "NH3",
+   "site": "centre",
+   "E_ads_eV": -0.23711648831418586,
+   "q_gas_e": 0.007371090000000052,
+   "gap_complex_eV": 0.36489299655,
+   "d_min_A": 2.3165991950268934,
+   "converged": true
+  },
+  {
+   "analyte": "NH3",
+   "orientation": "NH3",
+   "site": "edge",
+   "E_ads_eV": -0.142065876313481,
+   "q_gas_e": -0.003968720000000037,
+   "gap_complex_eV": 0.364068787383,
+   "d_min_A": 2.854097893909893,
+   "converged": true
+  },
+  {
+   "analyte": "CO",
+   "orientation": "CO",
+   "site": "centre",
+   "E_ads_eV": -0.23796845150286572,
+   "q_gas_e": -0.06523058000000001,
+   "gap_complex_eV": 0.366101809993,
+   "d_min_A": 2.5731405017875493,
+   "converged": true
+  },
+  {
+   "analyte": "CO",
+   "orientation": "CO",
+   "site": "edge",
+   "E_ads_eV": -0.22538214687415348,
+   "q_gas_e": -0.06794118,
+   "gap_complex_eV": 0.362435225131,
+   "d_min_A": 2.5536017988939985,
+   "converged": true
+  },
+  {
+   "analyte": "O2",
+   "orientation": "O2",
+   "site": "centre",
+   "E_ads_eV": -2.3298520545148733,
+   "q_gas_e": -0.42839550000000004,
+   "gap_complex_eV": 0.696808888727,
+   "d_min_A": 1.451250019236519,
+   "converged": true
+  },
+  {
+   "analyte": "O2",
+   "orientation": "O2",
+   "site": "edge",
+   "E_ads_eV": -2.754331744491452,
+   "q_gas_e": -0.41764342,
+   "gap_complex_eV": 0.753738308233,
+   "d_min_A": 1.433702785708822,
+   "converged": true
+  }
+ ],
+ "hexagons": [
+  [
+   -9,
+   10
+  ],
+  [
+   -8,
+   7
+  ],
+  [
+   -8,
+   8
+  ],
+  [
+   -8,
+   9
+  ],
+  [
+   -7,
+   3
+  ],
+  [
+   -7,
+   4
+  ],
+  [
+   -7,
+   5
+  ],
+  [
+   -7,
+   6
+  ],
+  [
+   -7,
+   7
+  ],
+  [
+   -7,
+   8
+  ],
+  [
+   -7,
+   9
+  ],
+  [
+   -6,
+   3
+  ],
+  [
+   -6,
+   4
+  ],
+  [
+   -6,
+   5
+  ],
+  [
+   -6,
+   6
+  ],
+  [
+   -6,
+   7
+  ],
+  [
+   -6,
+   8
+  ],
+  [
+   -5,
+   2
+  ],
+  [
+   -5,
+   5
+  ],
+  [
+   -5,
+   6
+  ],
+  [
+   -5,
+   7
+  ],
+  [
+   -5,
+   8
+  ],
+  [
+   -4,
+   1
+  ],
+  [
+   -4,
+   2
+  ],
+  [
+   -4,
+   6
+  ],
+  [
+   -4,
+   7
+  ],
+  [
+   -3,
+   2
+  ],
+  [
+   -3,
+   3
+  ],
+  [
+   -2,
+   0
+  ],
+  [
+   -2,
+   1
+  ],
+  [
+   -1,
+   -1
+  ],
+  [
+   -1,
+   0
+  ],
+  [
+   0,
+   0
+  ],
+  [
+   -10,
+   10
+  ],
+  [
+   -10,
+   9
+  ]
+ ]
+}

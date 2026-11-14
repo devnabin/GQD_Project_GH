@@ -1,0 +1,13 @@
+# Created date: 2026-11-12 (America/Chicago)
+# LaTeX build files (main.pdf is not ignored; decide whether to commit it)
+*.aux
+*.log
+*.bbl
+*.blg
+*.out
+*.toc
+*.lof
+*.lot
+*.fls
+*.fdb_latexmk
+*.synctex.gz

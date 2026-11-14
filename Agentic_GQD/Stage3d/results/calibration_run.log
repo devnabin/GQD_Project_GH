@@ -1,0 +1,25 @@
+skip pyrene_tri3_n2: link U2-U1 cannot close the ring: its ends are 9.45 A apart and 23 degrees off the link direction, but an n=2 link needs 6.57 A in a straight line. Use the same link length all around a ring, or units whose sizes fit the ring
+skip coronene_tri3_n1: link U2-U1 cannot close the ring: its ends are 6.35 A apart and 51 degrees off the link direction, but an n=1 link needs 4.01 A in a straight line. Use the same link length all around a ring, or units whose sizes fit the ring
+21 designs to run, 0 done
+gy_tri6: C54H18, E_NO2 -0.29 eV at pore/NO2, chem False, score 0.090, converged True, 19 s
+gy_hex7: C66H18, E_NO2 -1.03 eV at triple/NO2, chem True, score 0.000, converged True, 34 s
+gdy_tri6: C72H18, E_NO2 -0.95 eV at triple/NO2, chem True, score 0.029, converged True, 58 s
+gy_ring6: C48H24, E_NO2 -0.60 eV at centre/NO2, chem True, score 0.197, converged True, 19 s
+gdy_ring6: C60H24, E_NO2 -0.97 eV at triple/NO2, chem True, score 0.019, converged True, 28 s
+gy_rhomb9: C86H22, E_NO2 -1.01 eV at triple/NO2, chem True, score 0.000, converged True, 64 s
+gdy_hex7: C90H18, E_NO2 -0.92 eV at triple/NO2, chem True, score 0.048, converged True, 117 s
+gdy_rhomb4: C44H14, E_NO2 -0.98 eV at triple/NO2, chem True, score 0.009, converged True, 17 s
+gy_row6: C46H26, E_NO2 -0.21 eV at triple/NO2, chem False, score 0.101, converged True, 18 s
+gdy_row5: C46H22, E_NO2 -1.01 eV at triple/NO2, chem True, score 0.000, converged True, 12 s
+naph_row4_n1: C46H26, E_NO2 -0.77 eV at centre/NO2, chem True, score 0.111, converged True, 17 s
+naph_tri3_n2: C42H18, E_NO2 -0.97 eV at triple/NO2, chem True, score 0.020, converged True, 16 s
+pyrene_row3_n1: C52H26, E_NO2 -0.74 eV at edge/NO2, chem True, score 0.128, converged True, 14 s
+coronene_dimer_n1: C50H22, E_NO2 -0.86 eV at centre/NO2, chem True, score 0.076, converged True, 24 s
+coronene_dimer_n2: C52H22, E_NO2 -1.04 eV at triple/NO2_O, chem True, score 0.000, converged True, 23 s
+coronene_star3_n2: C54H24, E_NO2 -0.94 eV at triple/NO2, chem True, score 0.033, converged True, 23 s
+coronene_star6_n1: C72H36, E_NO2 -1.11 eV at triple/NO2, chem True, score 0.000, converged True, 53 s
+ovalene_star2_n2: C52H22, E_NO2 -0.93 eV at triple/NO2, chem True, score 0.043, converged True, 20 s
+ovalene_dimer_n1: C66H26, E_NO2 -0.97 eV at centre/NO2, chem True, score 0.013, converged True, 48 s
+circum_star2_n1: C70H26, E_NO2 -1.19 eV at triple/NO2, chem True, score 0.000, converged True, 40 s
+circum_star6_n2: C114H42, E_NO2 -1.11 eV at triple/NO2, chem True, score 0.000, converged True, 98 s
+all done

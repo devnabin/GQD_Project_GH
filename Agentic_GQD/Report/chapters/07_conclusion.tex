@@ -1,0 +1,79 @@
+% Chapter 7. Update the summary when a research question gets its final answer, and move
+% items from future work into the main text when they are done.
+\chapter{Conclusion and future work}
+\label{ch:conclusion}
+
+\section{Conclusion}
+
+This thesis built an agent workflow for designing graphene quantum dots for \ce{NO2} sensing, in
+which an LLM proposes structures and code and quantum chemistry decide which ones are valid and
+good. The LLM writes GQDs as hexagon positions on a honeycomb grid. Code converts them into
+molecules exactly, checks the closed-shell condition with a matching algorithm, and explains every
+rejection with edits that would fix it. With this feedback and the closed-shell rule in the prompt,
+99\% of design requests ended in a valid GQD, against 52\% without them (RQ1).
+
+An \ce{NO2} sensing score was defined from GFN2-xTB calculations of adsorption energy and charge
+transfer for \ce{NO2} and the competing gases. On 50 dataset GQDs it identified a design target that
+was not chosen by hand: a moderately small gap together with physisorption of \ce{NO2}. A DFT check
+showed that xTB is reliable for physisorption energies, overbinds chemisorbed \ce{NO2}, inflates
+the physisorbed charge and fails for \ce{O2} (RQ2, in part).
+
+In an evolutionary loop with the same xTB budget, both the LLM and random mutation improved on the
+best starting GQD: its score was 0.322, and the eight runs reached best scores of 0.331 to 0.356.
+Both moved toward GQDs with gaps of about 0.3 to 0.4~eV that still physisorb \ce{NO2} (RQ4). With
+three runs per mutator, the LLM's children scored higher on average in every pair of runs, but
+random mutation found the best GQD in two of the three pairs, so the LLM did not find better GQDs
+than random mutation (RQ3).
+
+Among the best GQDs the score reduces to the xTB charge transfer, and the DFT benchmark of twelve
+GQDs showed that this charge is an artefact: in DFT, physisorbed \ce{NO2} takes almost no charge
+(0.01~\(e\) against 0.23~\(e\)), and the score loses its ranking (\(\rho = -0.16\)). xTB remains
+useful for what it ranks well, the binding of \ce{NO2}, \ce{H2O} and \ce{NH3} and the selectivity
+margin (\(\rho = 0.74\) to 0.95), and DFT removes the \ce{O2} concern, since \ce{O2} does not bind
+(RQ2). The workflow therefore works as a search method, but the objective it searched needs a new
+response term before its best GQDs can be called good sensors. In DFT, the GQDs that keep a
+response are those that form a weak, reversible bond to \ce{NO2}.
+\pending{The baseline without evolution (E6).}
+
+\section{Future work}
+\label{sec:future}
+
+\paragraph{Replace the response term.} The DFT benchmark shows that the xTB charge on physisorbed
+\ce{NO2} cannot serve as the response. The candidates are an orbital descriptor such as the
+alignment of the GQD's HOMO with the singly occupied orbital of \ce{NO2}, a correction learned from
+DFT data, or a new target regime of weak, reversible chemisorption, which in DFT keeps a clear
+charge transfer. The selectivity term should use water as the main competitor. The loops should
+then be repeated with the new score, and the best candidates re-ranked with DFT.
+
+\paragraph{A sensor model.} A model of the sensing film, with gas coverage at real concentrations
+and humidity, adsorption and desorption kinetics, and the resulting change in resistance, would
+turn the molecular numbers into a predicted sensor signal and give the search a device-level goal.
+
+\paragraph{Complete the current experiments.} Add the baseline without evolution (E6) and repeat
+the comparison of E5b with more runs per mutator.
+
+\paragraph{Check the final candidates more thoroughly.} Probe all symmetry-distinct adsorption
+sites and optimise the most promising complexes, including any bonded \ce{O2} complex, at the DFT
+level instead of using xTB geometries.
+
+\paragraph{Beyond pure carbon (Stage 3b).} Nitrogen and boron dopants and edge groups such as
+\ce{-OH}, \ce{-COOH} and \ce{-NH2} change how strongly gases bind \cite{zhang2009dopants} and may
+offer much more headroom than shape alone. This needs a representation that labels individual
+atoms, new validity rules (dopants change the electron count and therefore the closed-shell
+condition), a new gap predictor or none, and a recalibrated score.
+
+\paragraph{A surrogate for the sensing score.} The logs of the loop contain hundreds of xTB-scored
+GQDs with all their descriptors. A model trained on them could replace part of the xTB budget, in
+the same way that the gap predictor does for the gap.
+
+\paragraph{Fine-tuning a smaller model.} The logs are designed to become three training sets: edits
+that improved the score (supervised fine-tuning), pairs of better and worse edits of the same
+parent (preference training with DPO \cite{rafailov2023dpo}), and target-to-structure examples from
+the 14{,}674 labelled dataset GQDs and the scored children. A small open model of about 7 to 8
+billion parameters, fine-tuned with LoRA \cite{hu2022lora}, could then be tested in the same loop
+against random mutation and the general-purpose LLM.
+
+\paragraph{Generative models as further baselines.} Models trained on SELFIES strings
+\cite{krenn2020selfies}, graph or diffusion models that work directly on the hexagon grid, and
+reinforcement learning in the style of REINVENT \cite{olivecrona2017reinvent} would place the
+LLM-guided loop among established methods.
